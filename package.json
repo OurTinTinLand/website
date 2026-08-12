@@ -1,0 +1,22 @@
+{
+  "name": "tintin-react",
+  "version": "1.0.0",
+  "description": "TinTinLand 官网 React 拆分 + esbuild 编译版。从单文件 index.html 拆出 35 个 .jsx 文件，用 esbuild + React 18 UMD 实现 buildless-dev 体验。",
+  "private": true,
+  "scripts": {
+    "dev": "node build.js --watch & node server.js",
+    "build": "node build.js",
+    "watch": "node build.js --watch",
+    "serve": "node server.js",
+    "serve:original": "node server-original.js",
+    "compare": "node server.js & node server-original.js",
+    "clean": "rm -rf dist",
+    "postinstall": "echo '注：本项目使用全局 esbuild；如需本地版本请手动 npm install esbuild'"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.1"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

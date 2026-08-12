@@ -1,0 +1,41 @@
+/* ============ 顶部导航 ============ */
+.topnav{position:sticky;top:0;z-index:70;background:rgba(248,246,255,.86);backdrop-filter:blur(16px);border-bottom:1px solid var(--line);}
+.nav-inner{display:flex;align-items:center;gap:18px;height:70px;}
+.brand{display:flex;align-items:center;gap:9px;flex:none;cursor:pointer;}
+.brand img{height:30px;width:auto;}
+.brand .bname{font-family:var(--f-disp);font-weight:700;font-size:19px;letter-spacing:-.03em;}
+.brand .bsuf{color:var(--ink-3);font-weight:600;}
+.navlinks{display:flex;gap:2px;align-items:center;margin-left:6px;flex:1;flex-wrap:wrap;}
+.navlinks button{background:none;border:none;padding:8px 12px;border-radius:var(--r-pill);font-size:13.5px;color:var(--ink-2);font-weight:550;transition:.15s;}
+.navlinks button:hover{background:var(--lilac-100);color:var(--ink);}
+.navlinks button.active{background:var(--ink);color:#fff;}
+.nav-right{display:flex;align-items:center;gap:9px;flex:none;}
+.lang{font-size:12.5px;color:var(--ink-2);border:1px solid var(--line);background:var(--surface);border-radius:var(--r-pill);padding:6px 11px;cursor:pointer;}
+
+/* ============ 悬浮吉祥物 ============ */
+.fab{position:fixed;right:24px;bottom:24px;width:70px;height:70px;border-radius:50%;background:var(--lilac-200);border:var(--stroke);box-shadow:var(--pop-sm);z-index:80;cursor:pointer;overflow:hidden;display:flex;align-items:flex-end;justify-content:center;animation:breath 3.4s ease-in-out infinite;}
+.fab[hidden]{display:none;}
+@keyframes breath{0%,100%{transform:scale(1);}50%{transform:scale(1.06);}}
+.fab img{width:112%;max-width:none;transform:translateY(6%);}
+.fab .dot{position:absolute;top:5px;right:6px;width:11px;height:11px;border-radius:50%;background:var(--coral);border:2px solid var(--ink);}
+.fabpanel{position:fixed;right:24px;bottom:104px;width:330px;max-height:70vh;background:var(--surface);border:var(--stroke);border-radius:var(--r-lg);box-shadow:var(--pop);z-index:81;display:none;flex-direction:column;overflow:hidden;}
+.fabpanel.on{display:flex;animation:fade .22s ease;}
+.fabhead{display:flex;align-items:center;gap:10px;padding:11px 13px;border-bottom:2.5px solid var(--ink);background:var(--lilac-100);}
+.fabhead .av{width:36px;height:36px;border-radius:50%;overflow:hidden;border:2px solid var(--ink);background:#fff;flex:none;display:flex;align-items:flex-end;justify-content:center;}
+.fabhead .av img{width:120%;max-width:none;}
+.fabhead .nm{font-weight:700;font-size:14px;}
+.fabhead .st{font-size:11px;color:var(--st-ongoing);}
+.fabhead button{margin-left:auto;border:none;background:transparent;font-size:15px;}
+.fabbody{flex:1;overflow-y:auto;padding:13px;display:flex;flex-direction:column;gap:11px;}
+.fabinput{display:flex;gap:7px;padding:11px;border-top:1.5px solid var(--line);}
+.fabinput input{flex:1;border:1.6px solid var(--line);border-radius:var(--r-pill);padding:8px 13px;font-size:13px;outline:none;}
+.fabinput button{border:none;background:var(--ink);color:#fff;border-radius:var(--r-pill);padding:8px 15px;font-size:13px;font-weight:650;}
+
+/* ============ 页脚 ============ */
+footer{background:var(--ink);color:#EFEBFF;padding:48px 0 26px;margin-top:20px;}
+.fgrid{display:grid;grid-template-columns:1.6fr 1fr 1fr 1fr;gap:28px;padding-bottom:26px;border-bottom:1px solid #2E2A44;}
+@media(max-width:860px){.fgrid{grid-template-columns:1fr 1fr;}}
+footer h4{font-size:13px;margin-bottom:12px;color:#fff;}
+footer a{display:block;font-size:13px;color:#A79FC4;padding:4px 0;cursor:pointer;}
+footer a:hover{color:#fff;}
+.fbottom{display:flex;justify-content:space-between;gap:14px;padding-top:18px;font-size:12px;color:#8A82A6;flex-wrap:wrap;}

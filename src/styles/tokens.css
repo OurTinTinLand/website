@@ -1,0 +1,65 @@
+/* ============ 设计 Tokens ============ */
+:root{
+  color-scheme: light;
+
+  /* ---- 品牌色（取自 TinTin Logo 渐变与吉祥物配件实测采样） ---- */
+  --brand-red:    #E64145;
+  --brand-magenta:#A233A8;
+  --brand-violet: #5F23F0;
+  --dog-violet:   #9383EE;
+  --grad-brand: linear-gradient(103deg,#E64145 0%,#A233A8 48%,#5F23F0 100%);
+  --grad-soft:  linear-gradient(135deg,#F0E9FF 0%,#FDEBF6 100%);
+
+  /* ---- 中性 ---- */
+  --ink:      #14121F;
+  --ink-2:    #4A4460;
+  --ink-3:    #8A82A6;
+  --paper:    #F8F6FF;
+  --surface:  #FFFFFF;
+  --lilac-50: #F3EEFF;
+  --lilac-100:#E7DEFF;
+  --lilac-200:#CCB4FC;
+  --line:     #E6DEFA;
+
+  /* ---- 功能/状态 ---- */
+  --violet-600:#6B4EF0;
+  --violet-800:#3D1FA8;
+  --pink: #FCA8D8;
+  --sun:  #FCE478;
+  --sky:  #549CFC;
+  --tangerine:#F0B454;
+  --coral:#FC6060;
+  --st-past:#A9A2BE;
+  --st-ongoing:#12B981;
+  --st-upcoming:#F0951E;
+
+  /* ---- 形状 ---- */
+  --r-xs:8px; --r-sm:14px; --r-md:20px; --r-lg:28px; --r-pill:999px;
+  --stroke: 2.5px solid var(--ink);
+  --pop: 5px 5px 0 var(--ink);
+  --pop-sm: 3px 3px 0 var(--ink);
+  --soft: 0 18px 44px rgba(61,31,168,.10), 0 2px 6px rgba(61,31,168,.05);
+
+  /* ---- 字体 ---- */
+  --f-disp:'Inter','Source Han Sans SC','Noto Sans SC','PingFang SC','Microsoft YaHei',sans-serif;
+  --f-body:'Inter','Source Han Sans SC','Noto Sans SC','PingFang SC','Microsoft YaHei',sans-serif;
+  --f-mono:'JetBrains Mono','SFMono-Regular',Menlo,Consolas,monospace;
+}
+
+/* ============ Base ============ */
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;}
+body{
+  background:
+    radial-gradient(900px 520px at 8% -8%, #EDE2FF 0%, transparent 62%),
+    radial-gradient(760px 440px at 100% -4%, #FDE6F4 0%, transparent 58%),
+    var(--paper);
+  color:var(--ink); font-family:var(--f-body); line-height:1.55;
+  -webkit-font-smoothing:antialiased;
+}
+a{color:inherit;text-decoration:none;}
+button,input,select,textarea{font-family:inherit;}
+button{cursor:pointer;}
+h1,h2,h3,h4{font-family:var(--f-disp);margin:0;letter-spacing:-.025em;line-height:1.15;font-weight:750;}
+.mono{font-family:var(--f-mono);letter-spacing:.02em;}
+img{display:block;}

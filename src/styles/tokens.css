@@ -1,65 +1,84 @@
-/* ============ 设计 Tokens ============ */
+/* ============ 设计 Tokens（与 claude.html 完全对齐） ============ */
 :root{
   color-scheme: light;
 
-  /* ---- 品牌色（取自 TinTin Logo 渐变与吉祥物配件实测采样） ---- */
-  --brand-red:    #E64145;
-  --brand-magenta:#A233A8;
-  --brand-violet: #5F23F0;
-  --dog-violet:   #9383EE;
-  --grad-brand: linear-gradient(103deg,#E64145 0%,#A233A8 48%,#5F23F0 100%);
-  --grad-soft:  linear-gradient(135deg,#F0E9FF 0%,#FDEBF6 100%);
+  /* ---- 品牌 ---- */
+  --grad: linear-gradient(100deg,#E64145 0%,#A233A8 46%,#5F23F0 100%);
+  --accent: #5F23F0;
 
   /* ---- 中性 ---- */
-  --ink:      #14121F;
-  --ink-2:    #4A4460;
-  --ink-3:    #8A82A6;
-  --paper:    #F8F6FF;
-  --surface:  #FFFFFF;
-  --lilac-50: #F3EEFF;
-  --lilac-100:#E7DEFF;
-  --lilac-200:#CCB4FC;
-  --line:     #E6DEFA;
+  --ink:   #08070C;
+  --ink-1: #16141E;
+  --ink-2: #514D63;
+  --ink-3: #8B8699;
+  --ink-4: #BEBAC9;
+  --paper:  #FFFFFF;
+  --paper-2:#FAFAFB;
+  --line:   #EBE9F0;
+  --line-2: #F4F3F7;
 
-  /* ---- 功能/状态 ---- */
-  --violet-600:#6B4EF0;
-  --violet-800:#3D1FA8;
-  --pink: #FCA8D8;
-  --sun:  #FCE478;
-  --sky:  #549CFC;
-  --tangerine:#F0B454;
-  --coral:#FC6060;
-  --st-past:#A9A2BE;
-  --st-ongoing:#12B981;
-  --st-upcoming:#F0951E;
+  /* ---- 深色区 ---- */
+  --d-bg:    #08070C;
+  --d-1:     #111017;
+  --d-line:  rgba(255,255,255,.09);
+  --d-line-2:rgba(255,255,255,.055);
+  --d-txt:   #9C97AB;
+  --d-txt-2: #6B667C;
+
+  /* ---- 状态 ---- */
+  --ok:   #0E9F6E;
+  --warn: #C2751A;
+  --past: #A9A5B8;
 
   /* ---- 形状 ---- */
-  --r-xs:8px; --r-sm:14px; --r-md:20px; --r-lg:28px; --r-pill:999px;
-  --stroke: 2.5px solid var(--ink);
-  --pop: 5px 5px 0 var(--ink);
-  --pop-sm: 3px 3px 0 var(--ink);
-  --soft: 0 18px 44px rgba(61,31,168,.10), 0 2px 6px rgba(61,31,168,.05);
+  --r-xs:3px;
+  --r-sm:6px;
+  --r-md:10px;
+  --r-lg:14px;
+  --r-pill:999px;
+  --sh-1:0 1px 2px rgba(8,7,12,.04);
+  --sh-2:0 10px 34px rgba(8,7,12,.07);
+  --sh-3:0 30px 80px rgba(8,7,12,.16);
 
   /* ---- 字体 ---- */
-  --f-disp:'Inter','Source Han Sans SC','Noto Sans SC','PingFang SC','Microsoft YaHei',sans-serif;
-  --f-body:'Inter','Source Han Sans SC','Noto Sans SC','PingFang SC','Microsoft YaHei',sans-serif;
+  --f:'Inter','Source Han Sans SC','Noto Sans SC','PingFang SC','Microsoft YaHei',sans-serif;
   --f-mono:'JetBrains Mono','SFMono-Regular',Menlo,Consolas,monospace;
+
+  /* ---- 缓动 ---- */
+  --e:cubic-bezier(.22,1,.36,1);
 }
 
 /* ============ Base ============ */
 *{box-sizing:border-box;}
 html,body{margin:0;padding:0;}
+html{scroll-behavior:smooth;-webkit-text-size-adjust:100%;}
 body{
-  background:
-    radial-gradient(900px 520px at 8% -8%, #EDE2FF 0%, transparent 62%),
-    radial-gradient(760px 440px at 100% -4%, #FDE6F4 0%, transparent 58%),
-    var(--paper);
-  color:var(--ink); font-family:var(--f-body); line-height:1.55;
+  background:var(--paper);
+  color:var(--ink);
+  font-family:var(--f);
+  line-height:1.6;
   -webkit-font-smoothing:antialiased;
+  -moz-osx-font-smoothing:grayscale;
 }
 a{color:inherit;text-decoration:none;}
-button,input,select,textarea{font-family:inherit;}
-button{cursor:pointer;}
-h1,h2,h3,h4{font-family:var(--f-disp);margin:0;letter-spacing:-.025em;line-height:1.15;font-weight:750;}
-.mono{font-family:var(--f-mono);letter-spacing:.02em;}
-img{display:block;}
+button,input,select,textarea{font-family:inherit;color:inherit;}
+button{cursor:pointer;border:none;background:transparent;padding:0;}
+button[disabled]{cursor:not-allowed;}
+img{display:block;max-width:100%;}
+::selection{background:var(--ink);color:#fff;}
+
+h1,h2,h3,h4{margin:0;line-height:1.06;letter-spacing:-.042em;font-weight:700;}
+p{margin:0;}
+
+/* 复用类 */
+.mono{font-family:var(--f-mono);}
+
+/* ============ 排版尺度 ============ */
+.kick{font-family:var(--f-mono);font-size:10.5px;letter-spacing:.2em;text-transform:uppercase;color:var(--ink-3);display:block;}
+.t1{font-size:clamp(44px,7vw,96px);letter-spacing:-.055em;font-weight:800;line-height:.98;}
+.t2{font-size:clamp(30px,4.2vw,56px);letter-spacing:-.05em;font-weight:760;line-height:1.04;}
+.t3{font-size:clamp(21px,2.3vw,28px);letter-spacing:-.038em;font-weight:700;}
+.t4{font-size:17px;letter-spacing:-.028em;font-weight:660;}
+.lead{font-size:16.5px;color:var(--ink-2);line-height:1.7;max-width:54ch;}
+.sm{font-size:13.5px;color:var(--ink-2);line-height:1.65;}
+.xs{font-size:12px;color:var(--ink-3);line-height:1.6;}

@@ -1,31 +1,25 @@
-// 通用卡片：按 kind 渲染 课程 / 活动 / 黑客松 三种
+// 通用排版卡片：按 kind 渲染 课程 / 活动 / 黑客松 三种
+// 与 claude.html 同：无插图，靠字号、间距、颜色梯度线作为视觉差
 import React, { Fragment } from 'react';
-import { COVERS, DOGS, dogUrl, stateOf, ST } from '../utils/constants';
-import { money, badgeClass, badgeText } from '../utils/format';
+import { stateOf, ST } from '../utils/constants';
+import { money } from '../utils/format';
 
 function CourseCard({ c, onOpen }) {
   const s = stateOf(c.start_at, c.end_at);
-  const priceEl = c.price.type === 'free' ? (
-    <span className="free">免费</span>
-  ) : (
-    <Fragment>¥{money(c.price.amount)}{c.price.origin ? (
-      <s style={{ color:'#B7AFC9', fontWeight:400, fontSize:13 }}> ¥{money(c.price.origin)}</s>
-    ) : null}</Fragment>
-  );
+  const p = c.price.type === 'free'
+    ? <span className="free">免费</span>
+    : <Fragment>¥{money(c.price.amount)}</Fragment>;
   return (
     <div className="card" onClick={() => onOpen(c.id)}>
-      <div className={`cover ${COVERS[c.cover]}`}>
-        <span className="tagpill">{c.category}</span>
-        <span className={badgeClass(s)}>{badgeText(ST, s)}</span>
-        <img className="cw" src={dogUrl(DOGS[c.dog])} alt="" />
+      <div className="c-top">
+        <span className="c-cat">{c.category}</span>
+        <span className={'st ' + s}>{ST[s]}</span>
       </div>
-      <div className="cbody">
-        <div className="ctitle">{c.title}</div>
-        <div className="csub">{c.difficulty} · {c.form} · {c.start_at}</div>
-        <div className="cfoot">
-          <span className="price">{priceEl}</span>
-          <span className="linkout">{c.content_source === 'external_link' ? '外链内容 ↗' : '站内详情 →'}</span>
-        </div>
+      <div className="c-t">{c.title}</div>
+      <p className="c-d">{c.desc.length > 52 ? c.desc.slice(0, 52) + '…' : c.desc}</p>
+      <div className="c-f">
+        <span className="pr">{p}</span>
+        <span className="lo">{c.difficulty} · {c.form}</span>
       </div>
     </div>
   );
@@ -33,20 +27,20 @@ function CourseCard({ c, onOpen }) {
 
 function EventCard({ e, onOpen }) {
   const s = stateOf(e.start_at, e.end_at);
+  const mmdd = (e.start_at || '').slice(5).replace('-', '.');
+  const yr = (e.start_at || '').slice(0, 4);
   return (
     <div className="card" onClick={() => onOpen(e.id)}>
-      <div className={`cover ${COVERS[e.cover]}`}>
-        <span className="tagpill">📍 {e.city}</span>
-        <span className={badgeClass(s)}>{badgeText(ST, s)}</span>
-        <img className="cw" src={dogUrl(DOGS[e.dog])} alt="" />
+      <div className="c-top">
+        <span className="c-cat">{e.tag}</span>
+        <span className={'st ' + s}>{ST[s]}</span>
       </div>
-      <div className="cbody">
-        <div className="ctitle">{e.title}</div>
-        <div className="csub">{e.tag} · {e.type} · {e.start_at}</div>
-        <div className="cfoot">
-          <span className="linkout">{e.content_source === 'external_link' ? '历史内容 · 外链' : '官网报名'}</span>
-          <span className="linkout" style={{ color:'var(--violet-800)' }}>详情 →</span>
-        </div>
+      <div className="dd"><span className="d1">{mmdd}</span><span className="d2">{yr}</span></div>
+      <div className="c-t" style={{ marginTop:8 }}>{e.title}</div>
+      <p className="c-d">{e.desc.length > 46 ? e.desc.slice(0, 46) + '…' : e.desc}</p>
+      <div className="c-f">
+        <span className="lo">{e.city} · {e.type}</span>
+        <span className="lo">{e.content_source === 'external_link' ? '外链 ↗' : '详情 →'}</span>
       </div>
     </div>
   );
@@ -56,22 +50,16 @@ function HackCard({ h, onOpen }) {
   const s = stateOf(h.start_at, h.end_at);
   return (
     <div className="card" onClick={() => onOpen(h.id)}>
-      <div className={`cover ${COVERS[h.cover]}`}>
-        <span className="tagpill">{h.theme} · {h.tracks.length} 赛道</span>
-        <span className={badgeClass(s)}>{badgeText(ST, s)}</span>
-        <img className="cw" src={dogUrl(DOGS[h.dog])} alt="" />
+      <div className="c-top">
+        <span className="c-cat">{h.theme} · {h.tracks.length} 赛道</span>
+        <span className={'st ' + s}>{ST[s]}</span>
       </div>
-      <div className="cbody">
-        <div className="csub" style={{ flex:'none' }}>奖金池</div>
-        <div className="prize">${money(h.prize_pool_usd)}</div>
-        <div className="ctitle" style={{ marginTop:4 }}>{h.title}</div>
-        <div className="csub">{h.tracks.map((t) => t.name).join(' · ')}</div>
-        <div className="cfoot">
-          <span className="linkout">报名截止 {h.deadline}</span>
-          <span className="linkout" style={{ color:'var(--violet-800)' }}>
-            {h.content_source === 'external_link' ? '外链 ↗' : '详情 →'}
-          </span>
-        </div>
+      <div className="pool">${money(h.prize_pool_usd)}</div>
+      <div className="c-t" style={{ marginTop:10 }}>{h.title}</div>
+      <p className="c-d">{h.tracks.map((t) => t.name).join(' · ')}</p>
+      <div className="c-f">
+        <span className="lo">截止 {h.deadline}</span>
+        <span className="lo">{h.content_source === 'external_link' ? '外链 ↗' : '详情 →'}</span>
       </div>
     </div>
   );

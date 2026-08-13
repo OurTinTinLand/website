@@ -1,31 +1,37 @@
-// Hero：标题 + stats + 吉祥物舞台（标准 React 版）
+// Hero：深色 band + badge + h1 + lead + 双 CTA + 4 列 stats
 import React from 'react';
-import { dogUrl } from '../utils/constants';
+import { useRoute } from '../utils/router';
 
 export function Hero() {
+  const { go } = useRoute();
   return (
-    <div className="hero-grid">
-      <div>
+    <section className="hero">
+      <div className="wrap hero-in">
         <div className="hero-badge">
-          <span className="pulse"></span>
-          2018 年至今 · 华语最大 Web3 开发者社区 · 2026 全面拓展 AI
+          <span className="d"></span>
+          2018 至今 · 30 万开发者 · 2026 全面转向 AI
         </div>
-        <h1>Hi，我是 TinTin，<span className="grad">来帮你找路。</span></h1>
-        <p className="lead">想学 AI、想打黑客松、想找生态工作、想买大模型 token——直接告诉我，我把你带到那一页，而不是丢一堆导航让你自己猜。</p>
-        <div className="hero-stats">
-          <div><span className="hs-n">30万+</span><span className="hs-l">开发者与用户</span></div>
-          <div><span className="hs-n">$370万+</span><span className="hs-l">累计发放奖励</span></div>
-          <div><span className="hs-n">800+</span><span className="hs-l">孵化项目原型</span></div>
+        <h1 className="t1">华语开发者的<br/>主场，<em>现在向 AI 敞开。</em></h1>
+        <p className="lead">
+          八年，30 万开发者、50 多条公链、$370 万奖金池，连成了一张真实运转的网。<br/>
+          课程、黑客松、生态合作、算力与 token——从这里开始，不用你自己找路。
+        </p>
+        <div className="hero-cta">
+          <button className="btn btn-inv btn-lg" onClick={() => {
+            const f = document.querySelector('#chatInput') || document.querySelector('.field input');
+            if (f) { f.scrollIntoView({ behavior:'smooth', block:'center' }); setTimeout(() => f.focus(), 420); }
+          }}>告诉我们你想做什么 <span className="arw">→</span></button>
+          <button className="btn btn-ghost-d btn-lg" onClick={() => go('enterprise')}>我是项目方</button>
         </div>
       </div>
-      <div className="dog-stage">
-        <div className="halo"></div>
-        <div className="sticker s1">KEEP CALM</div>
-        <div className="sticker s2">LET'S GO!</div>
-        <div className="sticker s3">HELLO!</div>
-        <img className="dog-hero" src={dogUrl('dog-sit')} alt="TinTin 吉祥物" />
-        <div className="speech">汪！问我点什么</div>
+      <div className="wrap" style={{ position:'relative' }}>
+        <div className="stats">
+          <div><div className="n">30万+</div><div className="l">开发者与用户</div></div>
+          <div><div className="n">$370万+</div><div className="l">累计发放奖金</div></div>
+          <div><div className="n">800+</div><div className="l">孵化项目原型</div></div>
+          <div><div className="n">56</div><div className="l">城市落地执行</div></div>
+        </div>
       </div>
-    </div>
+    </section>
   );
 }

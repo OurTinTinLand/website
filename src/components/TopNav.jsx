@@ -6,16 +6,15 @@ import { useStore, useToast } from '../state/store';
 const NAV = [
   ['home','首页'], ['courses','课程'], ['events','活动'], ['hackathons','黑客松'],
   ['jobs','招聘'], ['tokenhub','Token Hub'], ['apps','应用工具'],
-  ['enterprise','企业服务'], ['about','关于我们'],
+  ['enterprise','企业服务'], ['about','关于'],
 ];
 
-export function TopNav({ openLogin, onAdminGate }) {
+export function TopNav({ openLogin }) {
   const { page, go } = useRoute();
   const { session } = useStore();
   const toast = useToast();
   const [menuOpen, setMenuOpen] = useState(false);
 
-  // 路由切换时自动关闭汉堡菜单
   useEffect(() => { setMenuOpen(false); }, [page]);
 
   const onAuthClick = () => {
@@ -24,30 +23,38 @@ export function TopNav({ openLogin, onAdminGate }) {
   };
 
   return (
-    <div className="topnav">
-      <div className="container nav-inner">
-        <div className="brand" onClick={() => go('home')}>
-          <img src="assets-claude/brand/logo-h-dark.png" alt="TinTin" />
-          <span className="bname">Land</span>
+    <div className="nav">
+      <div className="wrap nav-in">
+        <div className="logo" onClick={() => go('home')}>
+          <img src="assets-claude/brand/logo-lockup.png" alt="TinTin" />
         </div>
-        <div className={'navlinks' + (menuOpen ? ' open' : '')}>
+        <div className={'nav-links' + (menuOpen ? ' open' : '')} id="navlinks">
           {NAV.map(([p, label]) => (
-            <button key={p} className={page === p ? 'active' : ''} onClick={() => go(p)}>{label}</button>
+            <button
+              key={p}
+              data-p={p}
+              className={page === p ? 'on' : ''}
+              onClick={() => go(p)}
+            >{label}</button>
           ))}
         </div>
-        <div className="nav-right">
-          <button className="lang" onClick={() => toast.show('语言切换为原型占位，V1.1 接 i18n')}>中 / EN</button>
-          <button className="btn btn-outline btn-sm" onClick={() => go('admin')}>运营后台</button>
-          {session.logged ? (
-            <button className="btn btn-ink btn-sm" onClick={onAuthClick}>{session.is_admin ? '个人中心 · 运营' : '个人中心'}</button>
-          ) : (
-            <button className="btn btn-primary btn-sm" onClick={onAuthClick}>登录</button>
-          )}
-          <button
-            className="hamburger"
-            aria-label="打开菜单"
-            onClick={() => setMenuOpen((v) => !v)}
-          >{menuOpen ? '✕' : '☰'}</button>
+        <div className="nav-r">
+          <button className="btn btn-line btn-sm lang" onClick={() => toast.show('i18n 留到 V1.1')}>EN</button>
+          <button className="btn btn-line btn-sm" id="navAdmin" onClick={() => go('admin')}>运营后台</button>
+          <button className="btn btn-fill btn-sm" id="navAuth" onClick={onAuthClick}>
+            {session.logged ? (session.is_admin ? '我的 · 运营' : '我的') : '登录'}
+          </button>
+          <button className="navtoggle" onClick={() => setMenuOpen((v) => !v)} aria-label={menuOpen ? '关闭菜单' : '打开菜单'}>
+            {menuOpen ? (
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M18 6 6 18" /><path d="m6 6 12 12" />
+              </svg>
+            ) : (
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <line x1="4" x2="20" y1="6" y2="6" /><line x1="4" x2="20" y1="12" y2="12" /><line x1="4" x2="20" y1="18" y2="18" />
+              </svg>
+            )}
+          </button>
         </div>
       </div>
     </div>

@@ -1,20 +1,18 @@
-// 招聘卡片
+// 招聘卡片：与课程 / 活动卡片同结构（纯排版）
 import React from 'react';
 
 export function JobCard({ job, onOpen }) {
   return (
     <div className="card" onClick={() => onOpen(job.id)}>
-      <div className="cbody" style={{ paddingTop:18 }}>
-        <div style={{ display:'flex', gap:6 }}>
-          <span className="tagpill">{job.role}</span>
-          {job.remote ? <span className="tagpill" style={{ background:'#BFF3DE' }}>支持远程</span> : null}
-        </div>
-        <div className="ctitle" style={{ marginTop:8 }}>{job.title}</div>
-        <div className="csub">{job.company} · {job.city}</div>
-        <div className="cfoot">
-          <span className="linkout">{job.reqs.length} 项要求</span>
-          <span className="linkout" style={{ color:'var(--violet-800)' }}>查看 JD →</span>
-        </div>
+      <div className="c-top">
+        <span className="c-cat">{job.role}</span>
+        {job.remote ? <span className="lo">支持远程</span> : null}
+      </div>
+      <div className="c-t">{job.title}</div>
+      <p className="c-d">{job.desc.length > 50 ? job.desc.slice(0, 50) + '…' : job.desc}</p>
+      <div className="c-f">
+        <span className="lo">{job.company} · {job.city}</span>
+        <span className="lo">JD →</span>
       </div>
     </div>
   );

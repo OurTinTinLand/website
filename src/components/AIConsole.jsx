@@ -1,23 +1,20 @@
-// Hero 内的假 AI 控制台：消息流 + 快捷 chips + persona + 输入框
-// 通过 prop 暴露 ask() 给外部 persona 卡使用
+// 首页假 AI 对话区：吉祥物头部 + 聊天气泡流 + 下划线输入 + 快捷指令
 import React, { Fragment, useState, useRef, useEffect } from 'react';
 import { matchRule } from '../ai/rules.js';
 import { BotBubble, UserBubble } from '../ai/ChatBubble';
+import { dogUrl } from '../utils/constants';
 
 const CHIPS = [
-  ['/推荐一门课',       '推荐一门课'],
-  ['/最近黑客松',        '最近有什么黑客松'],
-  ['/找生态工作',        '找生态工作'],
-  ['/了解 Token Hub',   '了解 token hub 怎么充值'],
-  ['/随便看看',          '随便看看'],
+  '推荐一门课',
+  '最近有什么黑客松',
+  '找生态工作',
+  '了解 token hub 怎么充值',
+  '随便看看',
 ];
 
-const INITIAL_MSG = '汪！点上面的快捷指令，或者直接打字告诉我你想干嘛——学东西、打黑客松、找工作、买大模型 token，我都能给你指路。';
+const INITIAL_MSG = '汪！点下面的快捷指令，或者直接打字告诉我你想干嘛——学东西、打比赛、找工作、买大模型 token，我都能给你指路。';
 
-// props:
-//   helpers: { navigate, openDetail, openForm, ... } 注入到 bot 消息的 CTA
-//   onAskReady?: (ask) => void   父组件拿到 ask 函数后传给 PersonaRow
-export function AIConsole({ helpers, onAskReady }) {
+export function AIConsole({ onAskReady }) {
   const [messages, setMessages] = useState([{ who:'bot', rule:null, text:INITIAL_MSG, key:0 }]);
   const logRef = useRef(null);
 
@@ -28,11 +25,11 @@ export function AIConsole({ helpers, onAskReady }) {
   const ask = (text) => {
     const trimmed = String(text || '').trim();
     if (!trimmed) return;
-    const userKey = Date.now() + Math.random();
-    setMessages((prev) => [...prev, { who:'user', text: trimmed, key: userKey }]);
+    const k = Date.now() + Math.random();
+    setMessages((prev) => [...prev, { who:'user', text: trimmed, key: k }]);
     setTimeout(() => {
       const rule = matchRule(trimmed);
-      setMessages((prev) => [...prev, { who:'bot', rule, key: userKey + 1 }]);
+      setMessages((prev) => [...prev, { who:'bot', rule, key: k + 1 }]);
     }, 260);
   };
 
@@ -48,53 +45,75 @@ export function AIConsole({ helpers, onAskReady }) {
     input.value = '';
   };
 
-  const onRecOpen = (it) => {
-    const k = 'price' in it ? 'courses'
-          : 'prize_pool_usd' in it ? 'hackathons'
-          : 'reqs' in it ? 'jobs' : 'events';
-    helpers.navigate(`${k}/${it.id}`);
-  };
-
   return (
-    <div className="console">
-      <div className="console-bar">
-        <div className="tri"><span></span><span></span><span></span></div>
-        <span className="t">tintin@tintinland — chat-router v1（规则引擎 · 非真实大模型 · V1.1 换真 AI 前端不改）</span>
-      </div>
-      <div className="console-body">
-        <div className="chatlog" ref={logRef}>
+    <div className="ask">
+      <div className="wrap ask-in">
+        <div className="ask-head">
+          <div className="face"><img src={dogUrl('dog-head')} alt="TinTin" /></div>
+          <div>
+            <div className="tt">TinTin</div>
+            <div className="ss">规则引擎 v1 · 真模型排在 V1.1，接口先留好</div>
+          </div>
+        </div>
+        <div className="log" id="chatlog" ref={logRef}>
           {messages.map((m) => (
-            <div key={m.key} className={'msg' + (m.who === 'user' ? ' user' : '')}>
+            <Fragment key={m.key}>
               {m.who === 'user' ? (
-                <UserBubble text={m.text} />
-              ) : (m.rule ? (
-                <BotBubble rule={m.rule} helpers={helpers} onRecOpen={onRecOpen} />
+                <div className="m me">
+                  <UserBubbleLite text={m.text} />
+                </div>
+              ) : m.rule ? (
+                <div className="m">
+                  <BotInline rule={m.rule} />
+                </div>
               ) : (
-                <BotBubbleLite text={m.text} />
-              ))}
-            </div>
+                <div className="m">
+                  <BotLite text={m.text} />
+                </div>
+              )}
+            </Fragment>
           ))}
         </div>
-        <div className="chips">
-          {CHIPS.map(([label, q]) => (
-            <button key={label} className="chip" onClick={() => ask(q)}>{label}</button>
-          ))}
-        </div>
-        <form className="console-input" onSubmit={onSubmit}>
-          <span className="p">➜</span>
-          <input name="q" placeholder="想学点 / 想打场 / 想找工作…  按 Enter 发送" />
-          <button type="submit" className="send">发送</button>
+        <form className="field" onSubmit={onSubmit}>
+          <input id="chatInput" name="q" placeholder="想学点什么？想打场比赛？想换个工作？" autoComplete="off" />
+          <button type="submit" className="send" aria-label="发送">→</button>
         </form>
+        <div className="qs">
+          {CHIPS.map((q) => (
+            <button key={q} onClick={() => ask(q)}>{q}</button>
+          ))}
+        </div>
       </div>
     </div>
   );
 }
 
-function BotBubbleLite({ text }) {
+function UserBubbleLite({ text }) {
   return (
     <Fragment>
-      <div className="av"><img src="assets-claude/brand/dog-head.png" alt="TinTin" /></div>
-      <div className="bubble"><div>{text}</div></div>
+      <div className="av">你</div>
+      <div className="bub">{text}</div>
+    </Fragment>
+  );
+}
+
+function BotLite({ text }) {
+  return (
+    <Fragment>
+      <div className="av"><img src={dogUrl('dog-head')} alt="" /></div>
+      <div className="bub">{text}</div>
+    </Fragment>
+  );
+}
+
+function BotInline({ rule }) {
+  return (
+    <Fragment>
+      <div className="av"><img src={dogUrl('dog-head')} alt="" /></div>
+      <div className="bub">
+        <span className="itag">{rule.intent}</span>
+        <div>{rule.reply}</div>
+      </div>
     </Fragment>
   );
 }

@@ -1,9 +1,38 @@
 // 假 AI 聊天气泡：bot 消息渲染（intent-tag + reply + recs + ctas）
+// 用于：首页对话区 / 悬浮球面板（结构共享）
 import React, { Fragment } from 'react';
 import { money } from '../utils/format';
-import { COVERS, DOGS, dogUrl } from '../utils/constants';
 
-// 单条推荐卡（点击触发 onOpen(item) → 调用方决定开详情 / 跳转）
+// 在对话流里渲染一条 bot 消息：头像 + intent 标签 + 文案 + 推荐条 + action 按钮
+export function BotBubble({ rule, onRecOpen, helpers }) {
+  const recs = rule.recs();
+  const ctas = rule.ctas(helpers);
+  return (
+    <Fragment>
+      <div className="av"><img src="assets-claude/brand/dog-head.png" alt="TinTin" /></div>
+      <div className="bub">
+        <span className="itag">{rule.intent}</span>
+        <div>{rule.reply}</div>
+        {recs.map((r, i) => <RecItem key={i} item={r} onOpen={onRecOpen} />)}
+        <div className="acts">
+          {ctas.map(([label, fn, kind], i) => (
+            <button key={i} className={kind || ''} onClick={fn}>{label}</button>
+          ))}
+        </div>
+      </div>
+    </Fragment>
+  );
+}
+
+export function UserBubble({ text }) {
+  return (
+    <Fragment>
+      <div className="av">你</div>
+      <div className="bub">{text}</div>
+    </Fragment>
+  );
+}
+
 function RecItem({ item, onOpen }) {
   const isCourse = 'price' in item;
   const isHack   = 'prize_pool_usd' in item;
@@ -18,43 +47,11 @@ function RecItem({ item, onOpen }) {
 
   return (
     <div className="rec" onClick={() => onOpen(item)}>
-      <div className="rc"></div>
       <div>
-        <div className="rt">{item.title}</div>
-        <div className="rs">{sub}</div>
+        <div className="a">{item.title}</div>
+        <div className="b">{sub}</div>
       </div>
-      <span style={{ marginLeft:'auto', fontSize:12, color:'var(--violet-800)', fontWeight:650 }}>查看 →</span>
+      <span className="go">→</span>
     </div>
-  );
-}
-
-// 一条 bot 消息
-export function BotBubble({ rule, onRecOpen, helpers }) {
-  const recs = rule.recs();
-  const ctas = rule.ctas(helpers);
-  return (
-    <Fragment>
-      <div className="av"><img src={dogUrl('dog-head')} alt="TinTin" /></div>
-      <div className="bubble">
-        <span className="intent-tag">intent: {rule.intent}</span>
-        <div>{rule.reply}</div>
-        {recs.map((r, i) => <RecItem key={i} item={r} onOpen={onRecOpen} />)}
-        <div className="ctas">
-          {ctas.map(([label, fn, kind], i) => (
-            <button key={i} className={kind || ''} onClick={fn}>{label}</button>
-          ))}
-        </div>
-      </div>
-    </Fragment>
-  );
-}
-
-// 一条 user 消息
-export function UserBubble({ text }) {
-  return (
-    <Fragment>
-      <div className="av">你</div>
-      <div className="bubble">{text}</div>
-    </Fragment>
   );
 }

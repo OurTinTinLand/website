@@ -6,11 +6,22 @@
 .brand .bname{font-family:var(--f-disp);font-weight:700;font-size:19px;letter-spacing:-.03em;}
 .brand .bsuf{color:var(--ink-3);font-weight:600;}
 .navlinks{display:flex;gap:2px;align-items:center;margin-left:6px;flex:1;flex-wrap:wrap;}
-.navlinks button{background:none;border:none;padding:8px 12px;border-radius:var(--r-pill);font-size:13.5px;color:var(--ink-2);font-weight:550;transition:.15s;}
+.navlinks button{background:none;border:none;padding:8px 12px;border-radius:var(--r-pill);font-size:13.5px;color:var(--ink-2);font-weight:550;transition:.15s;cursor:pointer;}
 .navlinks button:hover{background:var(--lilac-100);color:var(--ink);}
 .navlinks button.active{background:var(--ink);color:#fff;}
 .nav-right{display:flex;align-items:center;gap:9px;flex:none;}
 .lang{font-size:12.5px;color:var(--ink-2);border:1px solid var(--line);background:var(--surface);border-radius:var(--r-pill);padding:6px 11px;cursor:pointer;}
+.hamburger{display:none;background:var(--surface);border:1.6px solid var(--line);border-radius:10px;width:36px;height:36px;font-size:18px;line-height:1;cursor:pointer;color:var(--ink);}
+
+/* 窄屏：折叠 navlinks 为下拉 */
+@media(max-width:860px){
+  .nav-inner{gap:10px;}
+  .navlinks{display:none;position:absolute;top:70px;left:0;right:0;flex-direction:column;align-items:stretch;background:var(--surface);border-bottom:2px solid var(--ink);box-shadow:var(--pop);padding:10px 16px 16px;gap:4px;margin:0;}
+  .navlinks.open{display:flex;}
+  .navlinks button{text-align:left;padding:11px 14px;font-size:14.5px;}
+  .hamburger{display:inline-flex;align-items:center;justify-content:center;}
+  .lang{display:none;}
+}
 
 /* ============ 悬浮吉祥物 ============ */
 .fab{position:fixed;right:24px;bottom:24px;width:70px;height:70px;border-radius:50%;background:var(--lilac-200);border:var(--stroke);box-shadow:var(--pop-sm);z-index:80;cursor:pointer;overflow:hidden;display:flex;align-items:flex-end;justify-content:center;animation:breath 3.4s ease-in-out infinite;}
@@ -35,6 +46,7 @@
 footer{background:var(--ink);color:#EFEBFF;padding:48px 0 26px;margin-top:20px;}
 .fgrid{display:grid;grid-template-columns:1.6fr 1fr 1fr 1fr;gap:28px;padding-bottom:26px;border-bottom:1px solid #2E2A44;}
 @media(max-width:860px){.fgrid{grid-template-columns:1fr 1fr;}}
+@media(max-width:520px){.fgrid{grid-template-columns:1fr;}}
 footer h4{font-size:13px;margin-bottom:12px;color:#fff;}
 footer a{display:block;font-size:13px;color:#A79FC4;padding:4px 0;cursor:pointer;}
 footer a:hover{color:#fff;}

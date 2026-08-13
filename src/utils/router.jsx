@@ -5,11 +5,19 @@ import { PATH_ROUTE } from './constants';
 
 const RouteCtx = createContext(null);
 
+// 已知路由前缀集合：hash 第一段是这些时算合法，其余一律进 404
+const KNOWN_TOP = new Set([
+  '/', '/courses', '/events', '/hackathons', '/jobs', '/tokenhub', '/token-hub',
+  '/apps', '/enterprise', '/about', '/member', '/admin',
+  '/auth/login', '/auth/callback',
+]);
+
 function parseHash() {
   const h = (location.hash || '#/').slice(1);
   const seg = h.split('/').filter(Boolean);
   if (!seg.length) return { page: 'home', detailId: null };
   const base = '/' + seg[0];
+  if (!KNOWN_TOP.has(base)) return { page: 'notFound', detailId: null };
   const page = PATH_ROUTE[base] || 'home';
   return { page, detailId: seg[1] || null };
 }

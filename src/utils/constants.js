@@ -15,14 +15,21 @@ export const DOGS   = ['dog-sit','dog-skate','dog-guitar','dog-sleep','dog-harne
 export const dogUrl = (n) => `assets-claude/brand/${n}.png`;
 
 // 路由映射：原 ROUTE_PATH / PATH_ROUTE 等价物
+// - /tokenhub 是当前实现；/token-hub 是 spec §4 的写法，做别名兼容
+// - /auth/login / /auth/callback 承接 spec §4 的登录入口
 export const ROUTE_PATH = {
   home:'/', courses:'/courses', events:'/events', hackathons:'/hackathons',
   jobs:'/jobs', tokenhub:'/tokenhub', apps:'/apps', enterprise:'/enterprise',
   about:'/about', member:'/member', admin:'/admin',
+  authLogin:'/auth/login', authCallback:'/auth/callback',
+  notFound:'/__notfound__',
 };
 export const PATH_ROUTE = Object.fromEntries(
   Object.entries(ROUTE_PATH).map(([k, v]) => [v, k])
 );
+PATH_ROUTE['/token-hub']     = 'tokenhub';
+PATH_ROUTE['/auth/login']    = 'authLogin';
+PATH_ROUTE['/auth/callback'] = 'authCallback';
 
 // 表单定义：场景化报名表单的元数据
 export const FORM_DEF = {

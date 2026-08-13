@@ -14,13 +14,15 @@ import { EnterprisePage } from './pages/EnterprisePage';
 import { AboutPage } from './pages/AboutPage';
 import { MemberPage } from './pages/MemberPage';
 import { AdminPage } from './pages/AdminPage';
+import { NotFoundPage } from './pages/NotFoundPage';
+import { AuthLoginPage, AuthCallbackPage } from './pages/AuthPages';
+
+import { courses, events, hackathons, jobs } from './data/index.js';
 
 import { DetailModal } from './modals/DetailModal';
 import { LoginModal } from './modals/LoginModal';
 import { FormModal } from './modals/FormModal';
 import { PayModal } from './modals/PayModal';
-
-import { courses } from './data/index.js';
 
 function Shell() {
   const { page, detailId, go } = useRoute();
@@ -39,7 +41,8 @@ function Shell() {
   const closePay   = () => setPayCourseId(null);
 
   const handleSignup = (kind, id) => {
-    const item = (kind === 'course') ? courses.find((c) => c.id === id) : null;
+    const itemsByKind = { course: courses, event: events, hackathon: hackathons, job: jobs };
+    const item = itemsByKind[kind] ? itemsByKind[kind].find((x) => x.id === id) : null;
     const itemTitle = item ? item.title : '—';
     if (!session.logged) { openLogin(() => handleSignup(kind, id)); return; }
     if (kind === 'course' && item && item.price.type === 'paid') {
@@ -49,12 +52,12 @@ function Shell() {
     }
   };
 
-  const handleApply = (kind, id) => {
+  const handleApply = (kind, id, title) => {
     if (!session.logged) {
-      openLogin(() => handleApply(kind, id));
+      openLogin(() => handleApply(kind, id, title));
       return;
     }
-    openForm(kind, id);
+    openForm(kind, id, title);
   };
 
   const renderPage = () => {
@@ -64,8 +67,8 @@ function Shell() {
         <ListPage
           kind={page}
           onOpen={(id) => go(`${page}/${id}`)}
-          onApply={(kind) => handleApply(kind, null)}
-          onConsult={(kind) => handleApply(kind, null)}
+          onApply={(kind, id, title) => handleApply(kind, id, title)}
+          onConsult={(kind) => handleApply(kind)}
         />
       );
     }
@@ -74,7 +77,10 @@ function Shell() {
     if (page === 'about')      return <AboutPage />;
     if (page === 'member')     return <MemberPage openLogin={openLogin} />;
     if (page === 'admin')      return <AdminPage />;
-    return <HomePage />;
+    if (page === 'authLogin')  return <AuthLoginPage openLogin={openLogin} />;
+    if (page === 'authCallback') return <AuthCallbackPage />;
+    if (page === 'notFound')   return <NotFoundPage />;
+    return <NotFoundPage />;
   };
 
   return (

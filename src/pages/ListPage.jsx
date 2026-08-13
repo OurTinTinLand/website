@@ -92,10 +92,12 @@ export function ListPage({ kind, onOpen, onApply, onConsult }) {
         : (
           <div className="grid">
             {kind === 'jobs'
-              ? items.map((j) => <JobCard key={j.id} job={j} onOpen={onOpen} />)
+              ? items.map((j) => <JobCard key={j.id} job={j} onOpen={onOpen} onApply={() => onApply('job', j.id, j.title)} />)
               : kind === 'apps'
                 ? items.map((a) => <AppCard key={a.id} app={a} onConsult={() => onConsult('app-contact')} />)
-                : items.map((it) => <Card key={it.id} item={it} kind={kind} onOpen={onOpen} />)
+                : items.map((it) => (
+                    <Card key={it.id} item={it} kind={kind} onOpen={onOpen} onApply={() => onApply(kind === 'courses' ? 'course' : (kind === 'events' ? 'event' : (kind === 'hackathons' ? 'hackathon' : 'app')), it.id, it.title)} />
+                  ))
             }
           </div>
         )}

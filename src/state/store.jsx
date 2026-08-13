@@ -1,20 +1,30 @@
 // 全局 Store：Context + useState。所有 mutator 走 setState(prev => ...)。
 // 同时承载 Toast（useToast）——避免再起一个 Provider。
-import React, { useState, useCallback, useMemo, useContext, createContext } from 'react';
+// 持久化：session / orders / intents / mySignups / orderSeq 写入 localStorage，
+// 刷新后自动恢复。thTabReq 是 UI 跳转信号，不持久化。
+import React, { useState, useEffect, useCallback, useMemo, useContext, createContext } from 'react';
 import {
   seedSession, seedOrders, seedIntents, seedOrderSeq,
 } from './seed.js';
+import { loadState, saveState, clearState } from './persist.js';
 
 const StoreCtx = createContext(null);
 const ToastCtx = createContext(null);
 
 export function StoreProvider({ children }) {
-  const [session,   setSession]   = useState(seedSession);
-  const [orders,    setOrders]    = useState(seedOrders);
-  const [intents,   setIntents]   = useState(seedIntents);
-  const [mySignups, setMySignups] = useState([]);
-  const [orderSeq,  setOrderSeq]  = useState(seedOrderSeq);
-  const [thTabReq,  setThTabReq]  = useState(null);   // TokenHub tab 跳转请求
+  const [session,   setSession]   = useState(() => loadState('session',   seedSession));
+  const [orders,    setOrders]    = useState(() => loadState('orders',    seedOrders));
+  const [intents,   setIntents]   = useState(() => loadState('intents',   seedIntents));
+  const [mySignups, setMySignups] = useState(() => loadState('mySignups', []));
+  const [orderSeq,  setOrderSeq]  = useState(() => loadState('orderSeq',  seedOrderSeq));
+  const [thTabReq,  setThTabReq]  = useState(null);   // TokenHub tab 跳转请求（不持久化）
+
+  // 写回 localStorage：每次 state 变化后同步一次
+  useEffect(() => { saveState('session',   session);   }, [session]);
+  useEffect(() => { saveState('orders',    orders);    }, [orders]);
+  useEffect(() => { saveState('intents',   intents);   }, [intents]);
+  useEffect(() => { saveState('mySignups', mySignups); }, [mySignups]);
+  useEffect(() => { saveState('orderSeq',  orderSeq);  }, [orderSeq]);
 
   // —— mutators ——
   const login = useCallback((method, email) => {
@@ -27,6 +37,8 @@ export function StoreProvider({ children }) {
       logged:false, is_admin:false, method:'', user_id:'', email:'',
       profile:{ name:'', phone:'', city:'', github:'' },
     });
+    setMySignups([]);
+    // 登录态清掉，订单/意向保留（用于演示）——生产环境应同时清掉
   }, []);
 
   const demoAdmin = useCallback(() => {
@@ -69,11 +81,25 @@ export function StoreProvider({ children }) {
     setMySignups((prev) => [s, ...prev]);
   }, []);
 
+  // 调试用：清空所有持久化数据（对应 spec §6"清除登录态"按钮）
+  const resetAll = useCallback(() => {
+    clearState('session');
+    clearState('orders');
+    clearState('intents');
+    clearState('mySignups');
+    clearState('orderSeq');
+    setSession(seedSession);
+    setOrders(seedOrders);
+    setIntents(seedIntents);
+    setMySignups([]);
+    setOrderSeq(seedOrderSeq);
+  }, []);
+
   const value = useMemo(() => ({
     session, orders, intents, mySignups, orderSeq, thTabReq,
     login, logout, demoAdmin, saveProfile,
     addOrder, verifyOrder, addIntent, contactIntent, closeIntent, addSignup,
-    setThTabReq,
+    setThTabReq, resetAll,
   }), [session, orders, intents, mySignups, orderSeq, thTabReq]);
 
   return (

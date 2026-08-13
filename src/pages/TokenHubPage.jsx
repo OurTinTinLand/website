@@ -1,6 +1,6 @@
-// Token Hub：3 个 view（① 渠道介绍 ② 对接流程 ③ 提交意向单）
+// Token Hub：4 个 view（① 渠道介绍 ② 对接流程 ③ 提交意向单 ④ API / 用量）
 import React, { useState, useEffect } from 'react';
-import { providers } from '../data/providers.js';
+import { providers, USAGE_TIERS, API_SNIPPET } from '../data/providers.js';
 import { useStore, useToast } from '../state/store';
 
 export function TokenHubPage() {
@@ -55,9 +55,9 @@ export function TokenHubPage() {
         <div><b>原型占位数据。</b>渠道商名称、支持模型、起价均需运营用真实合作方信息替换（对应需求文档第 15 章问题 2，本周内提供素材）。</div>
       </div>
       <div className="th-tabs">
-        {[1,2,3].map((n) => (
+        {[1,2,3,4].map((n) => (
           <button key={n} className={'th-tab' + (thTab === n ? ' active' : '')} onClick={() => setThTab(n)}>
-            {['① 渠道介绍','② 对接流程','③ 提交意向单'][n-1]}
+            {['① 渠道介绍','② 对接流程','③ 提交意向单','④ API / 用量'][n-1]}
           </button>
         ))}
       </div>
@@ -69,6 +69,7 @@ export function TokenHubPage() {
               <div className="logo">{p.name.slice(-1)}</div>
               {p.todo && <span className="todo">TODO 待运营核实</span>}
               <h4 style={{ fontSize: 16 }}>{p.name}</h4>
+              <p className="sec-desc" style={{ fontSize: 12, margin: '4px 0 8px' }}>{p.tagline}</p>
               <div className="kv"><span>支持模型</span><b>{p.models}</b></div>
               <div className="kv"><span>起价</span><b>{p.price}</b></div>
               <div className="kv" style={{ border:'none' }}><span>结算方式</span><b>{p.settle}</b></div>
@@ -146,6 +147,64 @@ export function TokenHubPage() {
                 <div style={{ fontWeight: 700, fontSize: 14.5 }}>不确定选哪个渠道？</div>
                 <p className="sec-desc" style={{ fontSize: 13, margin:'4px 0 0' }}>在意向单里选「帮我推荐」，写清场景，运营会按你的用量和模型需求给对比建议。</p>
               </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className={'th-view' + (thTab === 4 ? ' active' : '')}>
+        <div className="split">
+          <div>
+            <div className="formcard">
+              <h3 style={{ fontSize: 17, marginBottom: 10 }}>模型与价格档位</h3>
+              <p className="sec-desc" style={{ fontSize: 13, marginBottom: 14 }}>按渠道分组，下方数字为参考起价（V1 上线后由运营每周校对一次）。</p>
+              {providers.map((p) => (
+                <div key={p.id} style={{ marginBottom: 16 }}>
+                  <div style={{ display:'flex', alignItems:'baseline', justifyContent:'space-between', marginBottom: 6 }}>
+                    <b style={{ fontSize: 14 }}>{p.name}</b>
+                    <span className="note">首字 {p.latency} · {p.settle}</span>
+                  </div>
+                  <table className="tbl" style={{ marginBottom: 4 }}>
+                    <tbody>
+                      <tr><th>模型</th><th>上下文</th><th>输入 / 1K</th><th>输出 / 1K</th></tr>
+                      {p.modelsDetail.map((m, i) => (
+                        <tr key={i}>
+                          <td><b>{m.name}</b></td>
+                          <td className="mono">{m.ctx}</td>
+                          <td className="mono">{m.in}</td>
+                          <td className="mono">{m.out}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ))}
+            </div>
+            <div className="formcard" style={{ marginTop: 14 }}>
+              <h3 style={{ fontSize: 17, marginBottom: 10 }}>用量档位与 SLA</h3>
+              <table className="tbl">
+                <tbody>
+                  <tr><th>档位</th><th>典型场景</th><th>服务承诺</th></tr>
+                  {USAGE_TIERS.map((u, i) => (
+                    <tr key={i}>
+                      <td><b>{u.tier}</b></td>
+                      <td>{u.hint}</td>
+                      <td className="note">{u.sla}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <div>
+            <div className="formcard" style={{ background:'var(--lilac-50)' }}>
+              <h3 style={{ fontSize: 17, marginBottom: 10 }}>调用样例</h3>
+              <p className="sec-desc" style={{ fontSize: 13, marginBottom: 12 }}>所有渠道都走 OpenAI 兼容协议，一把 key 切换不同模型。</p>
+              <pre className="codeblock" style={{ background:'#0B0915', color:'#E9E3FF', padding:'14px 16px', borderRadius:12, fontSize:12.5, lineHeight:1.55, overflowX:'auto', fontFamily:'var(--f-mono)' }}>{API_SNIPPET}</pre>
+            </div>
+            <div className="formcard" style={{ marginTop: 14 }}>
+              <h4 style={{ marginBottom: 6 }}>对接后的看板</h4>
+              <p className="sec-desc" style={{ fontSize: 13 }}>V1.1 接入渠道商 API 后，会在个人中心 → 我的 Token Hub 意向里显示实时用量、限速与账单。本周提交意向后由运营人工发月度账单。</p>
             </div>
           </div>
         </div>

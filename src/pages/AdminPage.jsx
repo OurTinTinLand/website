@@ -14,7 +14,7 @@ export function AdminPage() {
   const isOps = session.logged && session.is_admin;
 
   return (
-    <div className="container" style={{ padding:'44px 28px 60px' }}>
+    <div className="container page-section">
       <div className="sec-head">
         <div><span className="eyebrow">Admin · /admin</span><h2>运营后台（最简版）</h2></div>
         <div className="sec-desc">本周只做两件事：支付人工核销、意向单跟进。内容审核与数据看板放 V1.1。</div>
@@ -63,62 +63,66 @@ function OrdersPanel({ orders, verifyOrder, toast }) {
         <span>💡</span>
         <div>对照工商银行商户流水核对到账，点「标记已核实」后系统自动向用户发放课程顾问微信码。</div>
       </div>
-      <table className="tbl">
-        <tbody>
-          <tr><th>订单号</th><th>用户</th><th>项目</th><th>金额</th><th>提交时间</th><th>状态</th><th>操作</th></tr>
-          {orders.map((o) => (
-            <tr key={o.id}>
-              <td className="mono">{o.id}</td>
-              <td>{o.user_email}</td>
-              <td>{o.item_title}</td>
-              <td>
-                ¥{money(o.amount)}{o.is_deposit ? <span className="badge b-pending" style={{ fontSize: 10, marginLeft: 4 }}>定金</span> : null}
-              </td>
-              <td className="mono" style={{ fontSize: 12 }}>{o.created_at}</td>
-              <td>
-                <span className={`badge b-${o.status === 'pending_review' ? 'pending' : o.status === 'verified' ? 'verified' : 'failed'}`}>{o.status}</span>
-              </td>
-              <td>
-                {o.status === 'pending_review'
-                  ? <button className="btn btn-pop btn-sm" onClick={() => { verifyOrder(o.id); toast.show(`${o.id} 已核实 · 顾问微信码已自动发放给 ${o.user_email}`); }}>
-                      标记已核实
-                    </button>
-                  : <span className="note">{o.advisor_code_sent ? '✓ 顾问码已发放' : '—'}</span>}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      <div className="tbl-scroll">
+        <table className="tbl">
+          <tbody>
+            <tr><th>订单号</th><th>用户</th><th>项目</th><th>金额</th><th>提交时间</th><th>状态</th><th>操作</th></tr>
+            {orders.map((o) => (
+              <tr key={o.id}>
+                <td className="mono">{o.id}</td>
+                <td>{o.user_email}</td>
+                <td>{o.item_title}</td>
+                <td>
+                  ¥{money(o.amount)}{o.is_deposit ? <span className="badge b-pending" style={{ fontSize: 10, marginLeft: 4 }}>定金</span> : null}
+                </td>
+                <td className="mono" style={{ fontSize: 12 }}>{o.created_at}</td>
+                <td>
+                  <span className={`badge b-${o.status === 'pending_review' ? 'pending' : o.status === 'verified' ? 'verified' : 'failed'}`}>{o.status}</span>
+                </td>
+                <td>
+                  {o.status === 'pending_review'
+                    ? <button className="btn btn-pop btn-sm" onClick={() => { verifyOrder(o.id); toast.show(`${o.id} 已核实 · 顾问微信码已自动发放给 ${o.user_email}`); }}>
+                        标记已核实
+                      </button>
+                    : <span className="note">{o.advisor_code_sent ? '✓ 顾问码已发放' : '—'}</span>}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </React.Fragment>
   );
 }
 
 function IntentsPanel({ intents, contactIntent, closeIntent, toast }) {
   return (
-    <table className="tbl">
-      <tbody>
-        <tr><th>单号</th><th>用户</th><th>渠道</th><th>预计用量</th><th>联系方式</th><th>状态</th><th>操作</th></tr>
-        {intents.map((i) => (
-          <tr key={i.id}>
-            <td className="mono">{i.id}</td>
-            <td>{i.user_email}</td>
-            <td>{i.provider}</td>
-            <td>{i.expected_volume}</td>
-            <td>{i.contact}</td>
-            <td>
-              <span className={`badge b-${i.status === 'pending' ? 'pending' : (i.status === 'contacted' ? 'verified' : 'failed')}`}>{i.status}</span>
-            </td>
-            <td>
-              {i.status === 'pending'
-                ? <button className="btn btn-pop btn-sm" onClick={() => { contactIntent(i.id); toast.show(`${i.id} 已标记为已联系`); }}>标记已联系</button>
-                : i.status === 'contacted'
-                  ? <button className="btn btn-outline btn-sm" onClick={() => { closeIntent(i.id); toast.show(`${i.id} 已关单`); }}>关单</button>
-                  : <span className="note">已关闭</span>}
-            </td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
+    <div className="tbl-scroll">
+      <table className="tbl">
+        <tbody>
+          <tr><th>单号</th><th>用户</th><th>渠道</th><th>预计用量</th><th>联系方式</th><th>状态</th><th>操作</th></tr>
+          {intents.map((i) => (
+            <tr key={i.id}>
+              <td className="mono">{i.id}</td>
+              <td>{i.user_email}</td>
+              <td>{i.provider}</td>
+              <td>{i.expected_volume}</td>
+              <td>{i.contact}</td>
+              <td>
+                <span className={`badge b-${i.status === 'pending' ? 'pending' : (i.status === 'contacted' ? 'verified' : 'failed')}`}>{i.status}</span>
+              </td>
+              <td>
+                {i.status === 'pending'
+                  ? <button className="btn btn-pop btn-sm" onClick={() => { contactIntent(i.id); toast.show(`${i.id} 已标记为已联系`); }}>标记已联系</button>
+                  : i.status === 'contacted'
+                    ? <button className="btn btn-outline btn-sm" onClick={() => { closeIntent(i.id); toast.show(`${i.id} 已关单`); }}>关单</button>
+                    : <span className="note">已关闭</span>}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }
 

@@ -10,7 +10,7 @@ export function Hero() {
           <span className="pulse"></span>
           2018 年至今 · 华语最大 Web3 开发者社区 · 2026 全面拓展 AI
         </div>
-        <h1>Hi，我是 TinTin，<br /><span className="grad">来帮你找路。</span></h1>
+        <h1>Hi，我是 TinTin，<span className="grad">来帮你找路。</span></h1>
         <p className="lead">想学 AI、想打黑客松、想找生态工作、想买大模型 token——直接告诉我，我把你带到那一页，而不是丢一堆导航让你自己猜。</p>
         <div className="hero-stats">
           <div><span className="hs-n">30万+</span><span className="hs-l">开发者与用户</span></div>

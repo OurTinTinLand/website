@@ -9,17 +9,20 @@
 .btn-pop:hover{box-shadow:1px 1px 0 var(--ink);transform:translate(2px,2px);}
 .btn-sm{padding:7px 14px;font-size:13px;}
 .btn-lg{padding:13px 26px;font-size:15px;}
+@media(max-width:420px){.btn-lg{padding:11px 20px;font-size:14.5px;}}
 .btn[disabled]{opacity:.45;pointer-events:none;}
 
 /* ============ 卡片 ============ */
 .card{background:var(--surface);border:1.8px solid var(--ink);border-radius:var(--r-md);overflow:hidden;display:flex;flex-direction:column;cursor:pointer;transition:transform .16s, box-shadow .16s;box-shadow:2px 2px 0 var(--ink);}
 .card:hover{transform:translateY(-4px);box-shadow:5px 7px 0 var(--ink);}
 .cover{height:132px;position:relative;display:flex;align-items:flex-start;justify-content:space-between;padding:11px;border-bottom:1.8px solid var(--ink);}
+@media(max-width:520px){.cover{height:108px;padding:9px;}}
 .cv1{background:linear-gradient(135deg,#CBB4FC,#9383EE);}
 .cv2{background:linear-gradient(135deg,#FCA8D8,#E64145);}
 .cv3{background:linear-gradient(135deg,#8FC6FF,#5F23F0);}
 .cv4{background:linear-gradient(135deg,#FCE478,#F0951E);}
 .cover .cw{position:absolute;right:8px;bottom:-4px;height:104px;opacity:.96;filter:drop-shadow(0 4px 8px rgba(0,0,0,.14));}
+@media(max-width:520px){.cover .cw{height:84px;right:6px;}}
 .tagpill{background:rgba(255,255,255,.94);border:1.4px solid var(--ink);border-radius:var(--r-pill);font-size:11px;font-weight:700;padding:3px 9px;}
 .state{display:inline-flex;align-items:center;gap:5px;background:#fff;border:1.4px solid var(--ink);border-radius:var(--r-pill);font-size:11px;font-weight:700;padding:3px 9px;}
 .state:before{content:'';width:6px;height:6px;border-radius:50%;}
@@ -42,6 +45,8 @@
 
 /* 表单 */
 .formcard{background:var(--surface);border:var(--stroke);border-radius:var(--r-md);padding:22px;box-shadow:var(--pop-sm);}
+@media(max-width:520px){.formcard{padding:16px;}}
+@media(max-width:420px){.formcard{padding:14px;}}
 .frow{margin-bottom:14px;}
 .frow label{display:block;font-size:12.5px;font-weight:650;color:var(--ink-2);margin-bottom:6px;}
 .frow input,.frow select,.frow textarea{width:100%;border:1.6px solid var(--line);border-radius:var(--r-xs);padding:10px 12px;font-size:14px;outline:none;background:var(--surface);transition:.14s;}
@@ -57,3 +62,10 @@
 
 /* 原型标注 */
 .spec{font-family:var(--f-mono);font-size:11px;color:var(--violet-800);background:var(--lilac-50);border-left:3px solid var(--dog-violet);padding:7px 11px;border-radius:0 6px 6px 0;margin-top:14px;}
+
+/* 表格横向滚动包装：窄屏避免 4-7 列表格撑爆布局 */
+.tbl-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;margin:0 -16px;padding:0 16px;}
+@media(max-width:420px){.tbl-scroll{margin:0 -12px;padding:0 12px;}}
+.tbl-scroll::-webkit-scrollbar{height:6px;}
+.tbl-scroll::-webkit-scrollbar-thumb{background:var(--line);border-radius:3px;}
+table.tbl{min-width:480px;}

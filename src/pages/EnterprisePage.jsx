@@ -16,7 +16,7 @@ const CARDS = [
 
 export function EnterprisePage({ onApply, onGoto }) {
   return (
-    <div className="container" style={{ padding:'44px 28px 60px' }}>
+    <div className="container page-section">
       <div className="sec-head">
         <div><span className="eyebrow">Enterprise · /enterprise</span><h2>企业服务</h2></div>
         <div className="sec-desc">三条产品线，每条一句话说清能力边界，统一走联系表单收口。</div>

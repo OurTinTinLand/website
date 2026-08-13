@@ -45,7 +45,7 @@ export function TokenHubPage() {
   };
 
   return (
-    <div className="container" style={{ padding:'44px 28px 60px' }}>
+    <div className="container page-section">
       <div className="sec-head">
         <div><span className="eyebrow">Token Hub · /tokenhub</span><h2>Token Hub</h2></div>
         <div className="sec-desc">AI 大模型 token 的代理与分销对接。注意：这里说的是大模型 API token，不是 Web3 代币发行。</div>
@@ -164,36 +164,40 @@ export function TokenHubPage() {
                     <b style={{ fontSize: 14 }}>{p.name}</b>
                     <span className="note">首字 {p.latency} · {p.settle}</span>
                   </div>
-                  <table className="tbl" style={{ marginBottom: 4 }}>
-                    <tbody>
-                      <tr><th>模型</th><th>上下文</th><th>输入 / 1K</th><th>输出 / 1K</th></tr>
-                      {p.modelsDetail.map((m, i) => (
-                        <tr key={i}>
-                          <td><b>{m.name}</b></td>
-                          <td className="mono">{m.ctx}</td>
-                          <td className="mono">{m.in}</td>
-                          <td className="mono">{m.out}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                  <div className="tbl-scroll">
+                    <table className="tbl" style={{ marginBottom: 4 }}>
+                      <tbody>
+                        <tr><th>模型</th><th>上下文</th><th>输入 / 1K</th><th>输出 / 1K</th></tr>
+                        {p.modelsDetail.map((m, i) => (
+                          <tr key={i}>
+                            <td><b>{m.name}</b></td>
+                            <td className="mono">{m.ctx}</td>
+                            <td className="mono">{m.in}</td>
+                            <td className="mono">{m.out}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               ))}
             </div>
             <div className="formcard" style={{ marginTop: 14 }}>
               <h3 style={{ fontSize: 17, marginBottom: 10 }}>用量档位与 SLA</h3>
-              <table className="tbl">
-                <tbody>
-                  <tr><th>档位</th><th>典型场景</th><th>服务承诺</th></tr>
-                  {USAGE_TIERS.map((u, i) => (
-                    <tr key={i}>
-                      <td><b>{u.tier}</b></td>
-                      <td>{u.hint}</td>
-                      <td className="note">{u.sla}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              <div className="tbl-scroll">
+                <table className="tbl">
+                  <tbody>
+                    <tr><th>档位</th><th>典型场景</th><th>服务承诺</th></tr>
+                    {USAGE_TIERS.map((u, i) => (
+                      <tr key={i}>
+                        <td><b>{u.tier}</b></td>
+                        <td>{u.hint}</td>
+                        <td className="note">{u.sla}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
           <div>

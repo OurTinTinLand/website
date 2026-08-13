@@ -6,7 +6,7 @@ import { dogUrl } from '../utils/constants';
 export function NotFoundPage() {
   const { go } = useRoute();
   return (
-    <div className="container" style={{ padding: '80px 28px 100px', textAlign: 'center' }}>
+    <div className="container page-section" style={{ textAlign: 'center' }}>
       <img src={dogUrl('dog-sleep')} style={{ width: 200, margin: '0 auto 12px' }} alt="" />
       <h2 style={{ fontSize: 30, marginBottom: 6 }}>这页还没写好（404）</h2>
       <p className="sec-desc" style={{ maxWidth: 520, margin: '0 auto 22px' }}>

@@ -58,7 +58,7 @@ export function ListPage({ kind, onOpen, onApply, onConsult }) {
   }, [all, filter, kind]);
 
   return (
-    <div className="container" style={{ padding:'44px 28px 60px' }}>
+    <div className="container page-section">
       <div className="sec-head">
         <div><span className="eyebrow">{meta.eyebrow}</span><h2>{meta.title}</h2></div>
         <div className="sec-desc">{meta.desc}</div>

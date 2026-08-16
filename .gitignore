@@ -29,3 +29,5 @@ coverage/
 
 # TypeScript
 *.tsbuildinfo
+# GitHub Pages staging directory (produced by .github/workflows/deploy.yml)
+.github/_site/

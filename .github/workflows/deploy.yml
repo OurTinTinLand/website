@@ -1,0 +1,75 @@
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# Allow only one concurrent deployment; new runs wait for the in-progress one.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+# Required for the official Pages deployment actions.
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+jobs:
+  build:
+    name: Build site
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        # Use the runner default (Node 24 as of 2025-09; Node 20 is deprecated).
+        uses: actions/setup-node@v4
+
+      - name: Install dependencies
+        # package-lock.json is committed, so npm ci is fast and reproducible.
+        run: npm ci
+
+      - name: Build (esbuild → dist/bundle.js)
+        run: npm run build
+
+      - name: Stage deploy artifact
+        # The runtime only needs:
+        #   - index.html          (entry HTML)
+        #   - src/styles/*.css    (CSS referenced by index.html)
+        #   - assets-claude/      (brand PNGs referenced by src/components/* etc.)
+        #   - dist/bundle.js      (bundled JS produced by the build step)
+        # Mirror that into .github/_site so the uploaded artifact stays small
+        # (no node_modules, no .git, no JSX src, no *.ai design files).
+        run: |
+          set -euo pipefail
+          rm -rf .github/_site
+          mkdir -p .github/_site/dist
+          cp index.html .github/_site/
+          cp -r src .github/_site/
+          cp -r assets-claude .github/_site/
+          cp dist/bundle.js .github/_site/dist/
+          echo "--- staged tree ---"
+          find .github/_site -maxdepth 4 -type f | sort
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: .github/_site
+
+  deploy:
+    name: Deploy to GitHub Pages
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v4

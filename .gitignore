@@ -37,3 +37,19 @@ backend/pb_data/
 backend/pb_data.*/
 backend/pb_public/
 
+# Adobe Illustrator source files (binary, regenerated from source)
+*.ai
+
+# Generated PDFs at repo root (not part of build)
+/*.pdf
+
+# Root-level brand exploration PNGs (kept in spec/assets/ instead)
+/Tintin*.png
+/tintin_dog.png
+/tintin_white_circle.png
+
+# Old shirt design source (32MB binary)
+/tintin_shirt_0715.ai
+
+# Separate Codex pet pipeline (frames / qa / references — not part of main site)
+/tintin-pet-run/

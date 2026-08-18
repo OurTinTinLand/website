@@ -30,7 +30,7 @@ migrate(function(rootApp) {
 
     var COURSES = [
         { slug: "ai-agent-bootcamp-2026", title: "TinTin AI Agent 实战训练营",
-          category: "AI Agent", difficulty: "入门", form: "训练营",
+          category: "AI Agent·FDE", difficulty: "入门", form: "训练营",
           price_type: "paid", price_amount: 2599, price_origin: 3599, price_deposit: 199,
           cover: "cv1", dog: "dog-sit",
           start_at: "2026-08-15", end_at: "2026-10-25",
@@ -38,9 +38,11 @@ migrate(function(rootApp) {
           teacher: "TinTinLand 教研组 · 前大厂 Agent 方向工程师",
           desc: "10 周直播实训，从 Prompt 工程、RAG 知识库到 Agent 自动化工作流，带你亲手做出一个可演示、可复盘、可写进作品集的 AI 应用。零基础可学，50 人小班。",
           outline: [["W1-2","大模型与 Prompt 工程基础，搭第一个可用的对话应用"],["W3-4","RAG 知识库：文档切分、向量检索、召回评估"],["W5-7","Agent 框架与工具调用，做出能自主完成任务的智能体"],["W8-9","工作流自动化与多 Agent 协作，接入真实业务系统"],["W10","结业项目路演与作品集包装"]],
-          signup_fields: ["name","email","phone","bg"], order: 1, published: true },
+          signup_fields: ["name","email","phone","bg"], tags: ["Prompt", "LangChain", "RAG"],
+          signup_fields_config: {"name":"必","email":"必","phone":"选","city":"选","bg":"选"},
+          order: 1, published: true },
         { slug: "fde-bootcamp-2026", title: "FDE 企业效能顾问训练营",
-          category: "FDE", difficulty: "进阶", form: "训练营",
+          category: "AI Agent·FDE", difficulty: "进阶", form: "训练营",
           price_type: "paid", price_amount: 3999, price_origin: 0, price_deposit: 399,
           cover: "cv2", dog: "dog-harness",
           start_at: "2026-09-01", end_at: "2026-11-01",
@@ -48,7 +50,9 @@ migrate(function(rootApp) {
           teacher: "企业 AI 转型交付团队",
           desc: "面向想转型做企业 AI 落地顾问的学员：怎么做转型诊断、怎么设计陪跑方案、怎么把交付结果量化成企业能验收的指标。",
           outline: [["M1","企业 AI 成熟度诊断方法论"],["M2","场景筛选与 ROI 测算"],["M3","陪跑方案设计与交付验收"],["M4","真实客户案例复盘"]],
-          signup_fields: ["name","email","phone","city"], order: 2, published: true },
+          signup_fields: ["name","email","phone","city"], tags: ["陪跑", "ROI", "B2B"],
+          signup_fields_config: {"name":"必","email":"必","phone":"选","city":"选","bg":"选"},
+          order: 2, published: true },
         { slug: "ai-app-weekly-workshop", title: "AI 应用开发工作坊（每周直播）",
           category: "AI 应用", difficulty: "入门", form: "直播",
           price_type: "free", price_amount: 0, price_origin: 0, price_deposit: 0,
@@ -58,7 +62,9 @@ migrate(function(rootApp) {
           teacher: "社区讲师轮值",
           desc: "每周三晚免费直播，一次讲透一个 AI 工具的实战用法，当场演示当场答疑。",
           outline: [["第 1 期","Cursor 与 vibe coding 实操"],["第 2 期","用 n8n 做个人自动化工作流"],["第 3 期","低成本部署自己的知识库助手"]],
-          signup_fields: ["name","email"], order: 3, published: true },
+          signup_fields: ["name","email"], tags: ["Cursor", "vibe coding", "工作流"],
+          signup_fields_config: {"name":"必","email":"必","phone":"选","city":"选","bg":"选"},
+          order: 3, published: true },
         { slug: "ai-short-film-course", title: "AI 短剧编导实战课",
           category: "AI 短剧", difficulty: "入门", form: "录播",
           price_type: "free", price_amount: 0, price_origin: 0, price_deposit: 0,
@@ -68,7 +74,9 @@ migrate(function(rootApp) {
           external_url: "https://space.bilibili.com/1152852334",
           teacher: "AI 内容创作团队",
           desc: "用 AI 工具从剧本、分镜到成片的完整链路。一期已完结，全部内容托管在 B 站，点击直达原始视频。",
-          outline: [], signup_fields: [], order: 4, published: true },
+          outline: [], signup_fields: [], tags: ["剧本", "分镜", "成片"],
+          signup_fields_config: {"name":"必","email":"必","phone":"选","city":"选","bg":"选"},
+          order: 4, published: true },
         { slug: "web3-audit-101", title: "Web3 智能合约安全审计入门",
           category: "Web3 技术", difficulty: "中级", form: "录播",
           price_type: "free", price_amount: 0, price_origin: 0, price_deposit: 0,
@@ -78,7 +86,9 @@ migrate(function(rootApp) {
           external_url: "https://www.youtube.com/@TinTinLand",
           teacher: "生态安全合作伙伴",
           desc: "往期社区技术课，讲常见合约漏洞与审计流程。内容托管在 YouTube 频道。",
-          outline: [], signup_fields: [], order: 5, published: true }
+          outline: [], signup_fields: [], tags: ["Solidity", "审计"],
+          signup_fields_config: {"name":"必","email":"必","phone":"选","city":"选","bg":"选"},
+          order: 5, published: true }
     ];
 
     for (var i = 0; i < COURSES.length; i++) {

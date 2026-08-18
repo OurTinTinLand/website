@@ -35,6 +35,7 @@ onRecordCreateRequest(function(e) {
     r.set("status", "pending_review");
     // ★ v1.1: 前置发码 —— 下单即向用户展示顾问联系码
     r.set("advisor_code_sent", true);
+    r.set("advisor_code_sent_at", new Date().toISOString());
     e.next();
 }, "orders");
 
@@ -113,6 +114,8 @@ routerAdd("POST", "/api/orders/resend-advisor-code", function(e) {
     order.set("advisor_code_sent", true);
     order.set("resend_count", resendCount + 1);
     order.set("last_resend_at", new Date().toISOString());
+    // 重发时刷新 advisor_code_sent_at（语义：最近一次"联系码触达"时间）
+    order.set("advisor_code_sent_at", new Date().toISOString());
     $app.save(order);
 
     console.log("[orders] manual resend by superuser",
@@ -122,6 +125,7 @@ routerAdd("POST", "/api/orders/resend-advisor-code", function(e) {
         ok: true,
         id: order.id,
         advisor_code_sent: true,
+        advisor_code_sent_at: order.getString("advisor_code_sent_at"),
         resend_count: resendCount + 1,
         user_email: order.getString("user_email"),
     });

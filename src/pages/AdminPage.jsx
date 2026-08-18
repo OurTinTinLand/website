@@ -1,15 +1,32 @@
-// 运营后台：orders / intents / content + 鉴权闸门
-import React, { useState } from 'react';
+// 运营后台：spec v1.1 §14
+// 按"运营人员工作流"划分 6 个模块（不按前台板块拆分独立后台页）：
+//   14.2 内容管理中心（核心）— 含字段必选/可选配置 + 审核开关 + 上下架
+//   14.3 首页运营位管理
+//   14.4 报名/投递审核中心
+//   14.5 订单与支付核销（含手动补发）
+//   14.6 用户与权限管理（V1.1 暂用 is_admin）
+//   14.7 系统通知文案配置（占位）
+//   本周目标：模块一（内容管理）+ 模块四（订单核销）必须完整；其余做基础版
+import React, { useState, useMemo } from 'react';
 import { useStore, useToast } from '../state/store';
 import { money } from '../utils/format';
 import { dogUrl } from '../utils/constants';
+import { courses, events, hackathons, jobs } from '../data/index.js';
+import { COURSE_CATEGORIES, COURSE_SUBCATEGORIES } from '../data/index.js';
 
-const TABS = [['orders','订单核销'], ['intents','Token Hub 意向单'], ['content','内容录入']];
+const TABS = [
+  ['content',   '① 内容管理'],
+  ['homeops',   '② 首页运营位'],
+  ['review',    '③ 报名/投递审核'],
+  ['orders',    '④ 订单核销'],
+  ['users',     '⑤ 用户权限'],
+  ['notify',    '⑥ 通知文案'],
+];
 
 export function AdminPage() {
-  const { session, demoAdmin, orders, intents, verifyOrder, contactIntent, closeIntent } = useStore();
+  const { session, demoAdmin } = useStore();
   const toast = useToast();
-  const [tab, setTab] = useState('orders');
+  const [tab, setTab] = useState('content');
 
   const isOps = session.logged && session.is_admin;
 
@@ -18,18 +35,23 @@ export function AdminPage() {
       <div className="wrap">
         <div className="sec-h">
           <div><span className="kick">Admin</span><h2 className="t2">运营后台</h2></div>
-          <p className="lead">本周只做两件事：支付人工核销、意向单跟进。内容审核与数据看板放 V1.1。</p>
+          <p className="lead">按运营工作流划分 6 个模块 · 本周完成 ① 内容管理 + ④ 订单核销，其余基础版。</p>
         </div>
 
-        <div className="subs">
+        <div className="subs scroll-x">
           {TABS.map(([k, label]) => (
             <button key={k} className={'sub' + (tab === k ? ' on' : '')} onClick={() => setTab(k)}>{label}</button>
           ))}
         </div>
 
-        {tab === 'orders'  && (isOps ? <OrdersPanel  orders={orders}    verifyOrder={verifyOrder}   toast={toast} /> : <Gate onDemo={() => { demoAdmin(); toast.show('已切换为运营身份（仅原型演示）'); }} />)}
-        {tab === 'intents' && (isOps ? <IntentsPanel intents={intents} contactIntent={contactIntent} closeIntent={closeIntent} toast={toast} /> : <Gate onDemo={() => { demoAdmin(); toast.show('已切换为运营身份（仅原型演示）'); }} />)}
-        {tab === 'content' && (isOps ? <ContentPanel toast={toast} /> : <Gate onDemo={() => { demoAdmin(); toast.show('已切换为运营身份（仅原型演示）'); }} />)}
+        {!isOps && <Gate onDemo={() => { demoAdmin(); toast.show('已切换为运营身份（仅原型演示）'); }} />}
+
+        {isOps && tab === 'content'   && <ContentCenter />}
+        {isOps && tab === 'homeops'   && <HomeOps />}
+        {isOps && tab === 'review'    && <ReviewCenter />}
+        {isOps && tab === 'orders'    && <OrdersOps />}
+        {isOps && tab === 'users'     && <UserOps />}
+        {isOps && tab === 'notify'    && <NotifyConfig />}
       </div>
     </section>
   );
@@ -40,23 +62,365 @@ function Gate({ onDemo }) {
     <div className="empty">
       <img src={dogUrl('dog-harness')} alt="" />
       运营后台需要管理员权限。<br />
-      生产环境按 Supabase RLS + role 字段鉴权，前端路由同时拦截。
+      生产环境按 PocketBase 角色规则鉴权，前端路由同时拦截。
       <br /><br />
       <button className="btn btn-fill" onClick={onDemo}>（演示）以运营身份进入</button>
     </div>
   );
 }
 
-function OrdersPanel({ orders, verifyOrder, toast }) {
+// ========== ① 内容管理中心 §14.2 ==========
+function ContentCenter() {
+  const [kind, setKind] = useState('courses');
+  const [list, setList] = useState(() => initialList('courses'));
+  const [editing, setEditing] = useState(null);
+
+  const switchKind = (k) => {
+    setKind(k);
+    setList(initialList(k));
+    setEditing(null);
+  };
+
   return (
     <>
-      <div className="spec" style={{ marginBottom:24 }}>
-        对照工商银行商户流水核对到账，点「已核实」后系统自动向用户发放课程顾问微信码。
+      <div className="spec" style={{ marginBottom:18 }}>
+        课程 / 活动 / 黑客松 / 招聘 / 应用工具 / Token Hub 渠道 · 统一「列表 → 新建 → 编辑 → 上下架 → 删除」标准链路。
+      </div>
+
+      <div className="pills" style={{ marginBottom:18 }}>
+        {[['courses','课程'],['events','活动'],['hackathons','黑客松'],['jobs','招聘'],['apps','应用工具'],['providers','Token Hub 渠道']].map(([k, l]) => (
+          <button key={k} className={kind === k ? 'on' : ''} onClick={() => switchKind(k)}>{l}</button>
+        ))}
+      </div>
+
+      <button className="btn btn-fill btn-sm" style={{ marginBottom:14 }} onClick={() => setEditing({ id:'', __new:true, kind, review_required:false, fields_config:{}, tags:[], state:'upcoming' })}>
+        + 新建{kindLabel(kind)}
+      </button>
+
+      <ContentList kind={kind} list={list} onEdit={setEditing} onChange={setList} />
+
+      {editing && (
+        <ContentEditModal
+          def={editing}
+          kind={kind}
+          onClose={() => setEditing(null)}
+          onSave={(saved) => {
+            setList((prev) => {
+              const exists = prev.find((x) => x.id === saved.id);
+              if (exists) return prev.map((x) => x.id === saved.id ? saved : x);
+              return [saved, ...prev];
+            });
+            setEditing(null);
+          }}
+        />
+      )}
+    </>
+  );
+}
+
+function kindLabel(k) {
+  return ({ courses:'课程', events:'活动', hackathons:'黑客松', jobs:'招聘', apps:'应用工具', providers:'Token Hub 渠道' })[k] || k;
+}
+
+function initialList(kind) {
+  if (kind === 'courses')    return courses.map(slim);
+  if (kind === 'events')     return events.map(slim);
+  if (kind === 'hackathons') return hackathons.map(slim);
+  if (kind === 'jobs')       return jobs.map(slim);
+  if (kind === 'apps')       return [{ id:'ap-1', title:'占位应用', state:'upcoming', review_required:false }];
+  if (kind === 'providers')  return [{ id:'pv-1', title:'合作渠道 A', state:'upcoming', review_required:false }];
+  return [];
+}
+
+function slim(x) {
+  return {
+    id: x.id, title: x.title,
+    category: x.category || x.tag || x.role || x.theme || '',
+    subcategory: x.subcategory || '',
+    tags: x.tags || [],
+    state: x.state || 'upcoming',
+    review_required: !!x.signup_review_required,
+    fields_config: x.signup_fields_config || {},
+    content_source: x.content_source || 'native',
+  };
+}
+
+function ContentList({ kind, list, onEdit, onChange }) {
+  const toggleState = (id) => {
+    onChange((prev) => prev.map((x) => x.id === id ? { ...x, state: x.state === 'off' ? 'upcoming' : 'off' } : x));
+  };
+  const remove = (id) => {
+    if (!confirm('确认删除？此操作不可恢复（演示）')) return;
+    onChange((prev) => prev.filter((x) => x.id !== id));
+  };
+
+  if (!list.length) return <div className="empty">该分类暂无内容</div>;
+
+  return (
+    <div className="tbl-scroll">
+      <table className="t">
+        <tbody>
+          <tr>
+            <th>标题</th><th>分类</th><th>二级</th><th>来源</th>
+            <th>报名审核</th><th>字段配置</th><th>状态</th><th>操作</th>
+          </tr>
+          {list.map((x) => (
+            <tr key={x.id}>
+              <td>{x.title}</td>
+              <td>{x.category || '—'}</td>
+              <td>{x.subcategory || '—'}</td>
+              <td><span className="xs">{x.content_source === 'external_link' ? '外链' : '站内'}</span></td>
+              <td>
+                {x.review_required
+                  ? <span className="bdg b-pending">需审核</span>
+                  : <span className="xs">不审核</span>}
+              </td>
+              <td><span className="xs">{Object.keys(x.fields_config || {}).length} 字段</span></td>
+              <td>
+                <span className={'bdg ' + (x.state === 'off' ? 'b-failed' : 'b-verified')}>
+                  {x.state === 'off' ? '已下架' : '已上架'}
+                </span>
+              </td>
+              <td style={{ whiteSpace:'nowrap' }}>
+                <button className="lnk" onClick={() => onEdit(x)}>编辑</button>
+                <button className="lnk" style={{ marginLeft:10 }} onClick={() => toggleState(x.id)}>
+                  {x.state === 'off' ? '上架' : '下架'}
+                </button>
+                <button className="lnk" style={{ marginLeft:10, color:'var(--danger, #c33)' }} onClick={() => remove(x.id)}>删除</button>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function ContentEditModal({ def, kind, onClose, onSave }) {
+  const [draft, setDraft] = useState(def);
+  const set = (k, v) => setDraft((p) => ({ ...p, [k]: v }));
+
+  const FIELD_KEYS = ['name','email','phone','region','role','tech_bg','age','edu','notify','company','title','city','github'];
+
+  const toggleFieldRequired = (k) => {
+    const cfg = { ...(draft.fields_config || {}) };
+    cfg[k] = cfg[k] === 'required' ? 'optional' : 'required';
+    if (!cfg[k]) delete cfg[k];
+    set('fields_config', cfg);
+  };
+
+  return (
+    <div className="mask on" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="modal">
+        <button className="x" onClick={onClose} aria-label="关闭">✕</button>
+        <div className="mb">
+          <h2 style={{ fontSize:22 }}>{draft.__new ? '新建' : '编辑'}{kindLabel(kind)}</h2>
+
+          <div className="fr"><label>标题</label><input value={draft.title || ''} onChange={(e) => set('title', e.target.value)} /></div>
+
+          {kind === 'courses' && (
+            <>
+              <div className="fr"><label>一级分类</label>
+                <select value={draft.category || ''} onChange={(e) => set('category', e.target.value)}>
+                  <option value="">—</option>
+                  {COURSE_CATEGORIES.map((c) => <option key={c}>{c}</option>)}
+                </select>
+              </div>
+              {draft.category === 'Web3 技术' && (
+                <div className="fr"><label>二级子类</label>
+                  <select value={draft.subcategory || ''} onChange={(e) => set('subcategory', e.target.value)}>
+                    <option value="">—</option>
+                    {COURSE_SUBCATEGORIES['Web3 技术'].map((c) => <option key={c}>{c}</option>)}
+                  </select>
+                </div>
+              )}
+            </>
+          )}
+
+          <div className="fr"><label>自定义标签 · 逗号分隔</label>
+            <input value={(draft.tags || []).join(',')} onChange={(e) => set('tags', e.target.value.split(',').map((s) => s.trim()).filter(Boolean))} placeholder="Solidity,EVM,审计" />
+          </div>
+
+          <div className="fr"><label>内容来源</label>
+            <select value={draft.content_source || 'native'} onChange={(e) => set('content_source', e.target.value)}>
+              <option value="native">站内自建（native）</option>
+              <option value="external_link">外链第三方（external_link）</option>
+            </select>
+          </div>
+
+          <hr className="hr-soft" />
+
+          <div className="spec">spec §14.2：报名审核开关 + 字段必选/可选</div>
+          <div className="fr"><label>报名是否需审核</label>
+            <label className="ck">
+              <input type="checkbox" checked={!!draft.review_required} onChange={(e) => set('review_required', e.target.checked)} />
+              开启审核（公开课程可不开启，仅用于建立用户数据库）
+            </label>
+          </div>
+
+          <div className="fr"><label>字段必选/可选</label>
+            <div className="fields-cfg">
+              {FIELD_KEYS.map((k) => {
+                const v = (draft.fields_config || {})[k];
+                return (
+                  <label key={k} className={'field-chip ' + (v || 'off')}>
+                    <input type="checkbox" checked={v === 'required'} onChange={() => toggleFieldRequired(k)} />
+                    {k}
+                  </label>
+                );
+              })}
+              <span className="xs">勾选 = required；不勾选 = optional；未列出 = 不出现</span>
+            </div>
+          </div>
+
+          <button className="btn btn-fill btn-lg" style={{ width:'100%', marginTop:18 }} onClick={() => {
+            const saved = { ...draft, id: draft.id || ('new-' + Date.now()), state: draft.state || 'upcoming' };
+            delete saved.__new;
+            onSave(saved);
+          }}>保存</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ========== ② 首页运营位 §14.3 ==========
+function HomeOps() {
+  return (
+    <>
+      <div className="spec">合作项目 Logo 墙 · 首页 Hero 内容 · 最新动态手动置顶</div>
+      <div className="grid g2">
+        <div className="card-ops">
+          <h4>合作项目 Logo 墙</h4>
+          <p>支持增删、拖拽排序</p>
+          <button className="btn btn-line btn-sm">管理 Logo</button>
+        </div>
+        <div className="card-ops">
+          <h4>首页 Hero 内容</h4>
+          <p>替换焦点图 / 标题 / 副标题 / 快捷 chip</p>
+          <button className="btn btn-line btn-sm">编辑 Hero</button>
+        </div>
+        <div className="card-ops">
+          <h4>最新动态手动置顶</h4>
+          <p>不完全依赖时间自动排序</p>
+          <button className="btn btn-line btn-sm">选择置顶内容</button>
+        </div>
+      </div>
+    </>
+  );
+}
+
+// ========== ③ 报名/投递审核中心 §14.4 ==========
+function ReviewCenter() {
+  const { reviewQueue, reviewSubmission } = useStore();
+  const toast = useToast();
+  const [kind, setKind] = useState('all');
+  const [status, setStatus] = useState('all');
+  const [picked, setPicked] = useState([]);
+
+  const filtered = useMemo(() => reviewQueue.filter((r) =>
+    (kind === 'all' || r.kind === kind) &&
+    (status === 'all' || r.review_status === status)
+  ), [reviewQueue, kind, status]);
+
+  const toggle = (id) => setPicked((p) => p.includes(id) ? p.filter((x) => x !== id) : [...p, id]);
+
+  const bulk = (target) => {
+    if (!picked.length) { toast.show('请先勾选'); return; }
+    reviewSubmission(picked, target);
+    toast.show(`已${target === 'approved' ? '通过' : '拒绝'} ${picked.length} 条`);
+    setPicked([]);
+  };
+
+  const KIND_OPTS = [
+    ['all','全部'],['course','课程报名'],['event','活动报名'],
+    ['hackathon','黑客松报名'],['job','招聘投递'],['job_posting','企业发布'],['talent','人才信息'],
+  ];
+  const STATUS_OPTS = [
+    ['all','全部状态'],['pending','待审核'],['approved','已通过'],['rejected','已拒绝'],['auto_approved','系统自动通过'],
+  ];
+
+  return (
+    <>
+      <div className="spec" style={{ marginBottom:14 }}>
+        覆盖课程 / 活动 / 黑客松 / 招聘投递 / 企业发布 / 人才信息 · 仅对开启「报名审核开关」的内容生效，公开内容会自动通过。
+      </div>
+
+      <div className="pills" style={{ marginBottom:10 }}>
+        {KIND_OPTS.map(([v, l]) => <button key={v} className={kind === v ? 'on' : ''} onClick={() => setKind(v)}>{l}</button>)}
+      </div>
+      <div className="pills" style={{ marginBottom:14 }}>
+        {STATUS_OPTS.map(([v, l]) => <button key={v} className={status === v ? 'on' : ''} onClick={() => setStatus(v)}>{l}</button>)}
+      </div>
+
+      <div style={{ marginBottom:10, display:'flex', gap:8 }}>
+        <button className="btn btn-fill btn-sm" onClick={() => bulk('approved')}>批量通过 · {picked.length}</button>
+        <button className="btn btn-line btn-sm" onClick={() => bulk('rejected')}>批量拒绝</button>
+        <button className="btn btn-line btn-sm" onClick={() => exportCsv(filtered)}>导出 CSV（用于签到）</button>
+      </div>
+
+      <div className="tbl-scroll">
+        <table className="t">
+          <tbody>
+            <tr>
+              <th><input type="checkbox" onChange={(e) => setPicked(e.target.checked ? filtered.map((r) => r.id) : [])} /></th>
+              <th>类型</th><th>对应内容</th><th>申请人</th><th>邮箱</th><th>电话</th><th>关键字段</th><th>状态</th><th>提交时间</th>
+            </tr>
+            {filtered.map((r) => (
+              <tr key={r.id}>
+                <td><input type="checkbox" checked={picked.includes(r.id)} onChange={() => toggle(r.id)} /></td>
+                <td><span className="xs">{KIND_OPTS.find(([v]) => v === r.kind)?.[1] || r.kind}</span></td>
+                <td>{r.item_title}</td>
+                <td>{r.applicant}</td>
+                <td>{r.email}</td>
+                <td>{r.phone}</td>
+                <td><span className="xs">{Object.entries(r.fields || {}).map(([k, v]) => `${k}:${v}`).join(' · ')}</span></td>
+                <td>
+                  <span className={'bdg ' + (
+                    r.review_status === 'approved' || r.review_status === 'auto_approved' ? 'b-verified'
+                      : r.review_status === 'rejected' ? 'b-failed' : 'b-pending'
+                  )}>{r.review_status}</span>
+                </td>
+                <td className="mono xs">{r.submitted_at}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </>
+  );
+}
+
+function exportCsv(rows) {
+  if (!rows.length) return;
+  const headers = ['id','kind','item_title','applicant','email','phone','fields','review_status','submitted_at'];
+  const csv = [headers, ...rows.map((r) => [
+    r.id, r.kind, r.item_title, r.applicant, r.email, r.phone,
+    JSON.stringify(r.fields || {}), r.review_status, r.submitted_at,
+  ])].map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n');
+  const blob = new Blob([csv], { type:'text/csv;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `review-queue-${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+}
+
+// ========== ④ 订单核销 §14.5 ==========
+function OrdersOps() {
+  const { orders, verifyOrder, resendAdvisorCode } = useStore();
+  const toast = useToast();
+
+  return (
+    <>
+      <div className="spec" style={{ marginBottom:18 }}>
+        spec §8.3：用户下单后联系码已立即发放，运营只更新订单状态为 verified；如联系码自动发送失败，可在此手动补发。
       </div>
       <div className="tbl-scroll">
         <table className="t">
           <tbody>
-            <tr><th>订单号</th><th>用户</th><th>项目</th><th>金额</th><th>时间</th><th>状态</th><th>操作</th></tr>
+            <tr>
+              <th>订单号</th><th>用户</th><th>项目</th><th>金额</th><th>下单时间</th><th>码发放</th><th>补发次数</th><th>状态</th><th>操作</th>
+            </tr>
             {orders.map((o) => (
               <tr key={o.id}>
                 <td className="mono">{o.id}</td>
@@ -64,11 +428,16 @@ function OrdersPanel({ orders, verifyOrder, toast }) {
                 <td>{o.item_title}</td>
                 <td>¥{money(o.amount)}{o.is_deposit ? <span className="lo" style={{ marginLeft:6 }}>定金</span> : null}</td>
                 <td className="mono" style={{ fontSize:11.5, color:'var(--ink-3)' }}>{o.created_at}</td>
-                <td><span className={'bdg ' + (o.status === 'verified' ? 'b-verified' : o.status === 'failed' ? 'b-failed' : 'b-pending')}>{o.status}</span></td>
+                <td className="mono xs">{o.advisor_code_sent_at || '—'}</td>
+                <td>{o.resend_count || 0}</td>
                 <td>
+                  <span className={'bdg ' + (o.status === 'verified' ? 'b-verified' : o.status === 'failed' ? 'b-failed' : 'b-pending')}>{o.status}</span>
+                </td>
+                <td style={{ whiteSpace:'nowrap' }}>
                   {o.status === 'pending_review'
-                    ? <button className="btn btn-fill btn-sm" onClick={() => { verifyOrder(o.id); toast.show(`${o.id} 已核实 · 顾问微信码已自动发给 ${o.user_email}`); }}>标记已核实</button>
-                    : <span className="xs">{o.advisor_code_sent ? '顾问码已发' : '—'}</span>}
+                    ? <button className="btn btn-fill btn-sm" onClick={() => { verifyOrder(o.id); toast.show(`${o.id} 已核实到账 · 仅更新状态（联系码已发）`); }}>标记已核实</button>
+                    : <span className="xs">已完成</span>}
+                  <button className="btn btn-line btn-sm" style={{ marginLeft:6 }} onClick={() => { resendAdvisorCode(o.id); toast.show(`${o.id} 已重新发放顾问码`); }}>补发码</button>
                 </td>
               </tr>
             ))}
@@ -79,47 +448,43 @@ function OrdersPanel({ orders, verifyOrder, toast }) {
   );
 }
 
-function IntentsPanel({ intents, contactIntent, closeIntent, toast }) {
+// ========== ⑤ 用户权限 §14.6 ==========
+function UserOps() {
   return (
-    <div className="tbl-scroll">
-      <table className="t">
-        <tbody>
-          <tr><th>单号</th><th>用户</th><th>渠道</th><th>用量</th><th>联系方式</th><th>状态</th><th>操作</th></tr>
-          {intents.map((i) => (
-            <tr key={i.id}>
-              <td className="mono">{i.id}</td>
-              <td>{i.user_email}</td>
-              <td>{i.provider}</td>
-              <td>{i.expected_volume}</td>
-              <td>{i.contact}</td>
-              <td><span className={'bdg ' + (i.status === 'pending' ? 'b-pending' : i.status === 'contacted' ? 'b-verified' : 'b-failed')}>{i.status}</span></td>
-              <td>
-                {i.status === 'pending'
-                  ? <button className="btn btn-fill btn-sm" onClick={() => { contactIntent(i.id); toast.show(`${i.id} 已标记为已联系`); }}>标记已联系</button>
-                  : i.status === 'contacted'
-                    ? <button className="btn btn-line btn-sm" onClick={() => { closeIntent(i.id); toast.show(`${i.id} 已关单`); }}>关单</button>
-                    : <span className="xs">已关闭</span>}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+    <>
+      <div className="spec" style={{ marginBottom:18 }}>
+        spec §14.6：4 种角色 · 本周暂用 is_admin 字段，生产环境按 PocketBase _superusers + 集合规则细分。
+      </div>
+      <div className="grid g2">
+        <div className="card-ops"><h4>超级管理员</h4><p>全部权限</p></div>
+        <div className="card-ops"><h4>内容运营</h4><p>内容管理中心 + 首页运营位</p></div>
+        <div className="card-ops"><h4>审核员</h4><p>报名/投递审核中心</p></div>
+        <div className="card-ops"><h4>客服</h4><p>用户历史行为查询（用于处理客诉）</p></div>
+      </div>
+    </>
   );
 }
 
-function ContentPanel({ toast }) {
+// ========== ⑥ 通知文案 §14.7 ==========
+function NotifyConfig() {
   return (
     <>
-      <div className="spec" style={{ marginBottom:24 }}>
-        本周内容录入走「运营整理表格 → 批量导入」，不做完整 CMS。V1.1 接 B站/YouTube/Luma 开放接口自动同步。
+      <div className="spec" style={{ marginBottom:18 }}>
+        spec §14.7：审核通过 / 订单核实 / 活动提醒等系统通知文案，由运营维护，不需要每次改动找开发。
       </div>
-      <div className="steps">
-        <div className="stp"><div className="n">Step 01</div><h4>整理表格</h4><p>标题、封面、时间、一句话简介、原始外链，五个字段就够。</p></div>
-        <div className="stp"><div className="n">Step 02</div><h4>批量导入</h4><p>CSV 上传后生成外链卡片，课程/活动/黑客松共用同一组件。</p></div>
-        <div className="stp"><div className="n">Step 03</div><h4>校对上线</h4><p>本周目标 20-30 条，剩下的上线后逐步补，不阻塞主线。</p></div>
+      <div className="fcard" style={{ maxWidth:680 }}>
+        <div className="fr"><label>审核通过</label>
+          <textarea rows="2" defaultValue="你报名的 {item_title} 已通过审核，期待你的参与！" />
+        </div>
+        <div className="fr"><label>订单核实</label>
+          <textarea rows="2" defaultValue="订单 {order_id} 已核实到账，正式为你开通课程/活动权限。" />
+        </div>
+        <div className="fr"><label>活动提醒</label>
+          <textarea rows="2" defaultValue="{item_title} 将在 {start_at} 开始，记得按时参加。" />
+        </div>
+        <button className="btn btn-fill" style={{ marginTop:10 }}>保存模板（V1.1）</button>
+        <div className="spec">V1.1 接入 PocketBase hooks 后，运营改文案无需发布。</div>
       </div>
-      <button className="btn btn-fill" style={{ marginTop:22 }} onClick={() => toast.show('原型演示：CSV 批量导入')}>上传 CSV</button>
     </>
   );
 }

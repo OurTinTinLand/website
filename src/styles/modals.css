@@ -32,3 +32,7 @@
 .qr img{width:100%;max-width:196px;margin:0 auto;border-radius:var(--r-sm);}
 .pays{display:flex;gap:14px;justify-content:center;flex-wrap:wrap;margin-top:14px;}
 .pays span{font-size:11px;color:var(--ink-3);}
+
+/* spec §8.3 顾问码展示框 */
+.advisor-box{display:flex;flex-direction:column;align-items:center;gap:6px;padding:18px 16px;border:1px dashed var(--line);border-radius:14px;background:var(--paper-2);margin-bottom:14px;}
+.advisor-qr{width:140px;height:140px;background:#fff;border:1px solid var(--line-2);border-radius:10px;padding:6px;object-fit:contain;}

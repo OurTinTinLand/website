@@ -1,5 +1,6 @@
 // 通用排版卡片：按 kind 渲染 课程 / 活动 / 黑客松 三种
 // 与 claude.html 同：无插图，靠字号、间距、颜色梯度线作为视觉差
+// spec v1.1：课程卡片展示 subcategory 与 tags；活动保留 spec §7.2 标签；黑客松保持奖金池
 import React, { Fragment } from 'react';
 import { stateOf, ST } from '../utils/constants';
 import { money } from '../utils/format';
@@ -9,14 +10,25 @@ function CourseCard({ c, onOpen }) {
   const p = c.price.type === 'free'
     ? <span className="free">免费</span>
     : <Fragment>¥{money(c.price.amount)}</Fragment>;
+
+  // 一级分类 + Web3 二级
+  const catLabel = c.category === 'Web3 技术' && c.subcategory
+    ? `${c.category} · ${c.subcategory}`
+    : c.category;
+
   return (
     <div className="card" onClick={() => onOpen(c.id)}>
       <div className="c-top">
-        <span className="c-cat">{c.category}</span>
+        <span className="c-cat">{catLabel}</span>
         <span className={'st ' + s}>{ST[s]}</span>
       </div>
       <div className="c-t">{c.title}</div>
       <p className="c-d">{c.desc.length > 52 ? c.desc.slice(0, 52) + '…' : c.desc}</p>
+      {c.tags && c.tags.length > 0 && (
+        <div className="c-tags">
+          {c.tags.slice(0, 3).map((t, i) => <span key={i} className="tag">#{t}</span>)}
+        </div>
+      )}
       <div className="c-f">
         <span className="pr">{p}</span>
         <span className="lo">{c.difficulty} · {c.form}</span>

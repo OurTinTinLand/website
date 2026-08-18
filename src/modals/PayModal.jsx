@@ -1,4 +1,6 @@
 // 支付弹层：全款/定金 → 收款码 → 标记已支付 → 显示 pending_review
+// spec v1.1 §8.3：顾问联系码改为「用户下单后立即自动发放」（前置到此环节）
+// 运营在后台人工核对到账后只更新订单状态为 verified，不再重复触发发码动作。
 import React, { useState } from 'react';
 import { useStore, useToast } from '../state/store';
 import { money } from '../utils/format';
@@ -19,7 +21,10 @@ export function PayModal({ course, onClose, onAdminJump }) {
       id: oid, user_id: session.user_id, user_email: session.email,
       item_type:'course', item_id: course.id, item_title: course.title,
       amount: amt, is_deposit: !!useDeposit, channel:'icbc_qr',
-      status:'pending_review', advisor_code_sent:false,
+      status:'pending_review',
+      // §8.3：下单即发码，运营只更新状态
+      advisor_code_sent: true, advisor_code_sent_at:'2026-08-12 10:32:08',
+      resend_count:0,
       created_at:'2026-08-12 10:32',
     });
     addSignup({
@@ -27,6 +32,7 @@ export function PayModal({ course, onClose, onAdminJump }) {
       title: course.title, time:'2026-08-12 10:32', status:'待核实',
     });
     setDone({ oid, amt });
+    toast.show('订单已创建 · 顾问微信码已自动发放 · 加好友后报订单号核对到账');
   };
 
   return (
@@ -37,14 +43,17 @@ export function PayModal({ course, onClose, onAdminJump }) {
 
           {done ? (
             <>
-              <h2 style={{ fontSize:24 }}>收到了，等核实</h2>
-              <p className="xs" style={{ margin:'14px 0 24px' }}>
-                订单 {done.oid} · 实付 ¥{money(done.amt)}{useDeposit ? '（定金）' : ''}
-                <br />
-                <span className={'bdg ' + (done.amt ? 'b-pending' : '')}>pending_review</span>
-                <br />
-                运营核对到账后自动把顾问微信码发给你，一般 30 分钟内。
+              <h2 style={{ fontSize:24 }}>收到了，顾问码已发</h2>
+              <p className="xs" style={{ margin:'14px 0 20px' }}>
+                订单 <span className="mono">{done.oid}</span> · 实付 ¥{money(done.amt)}{useDeposit ? '（定金）' : ''}
               </p>
+              <div className="advisor-box">
+                <div className="xs">课程顾问微信 · 报订单号即可快速核对到账</div>
+                <img className="advisor-qr" src="assets-claude/advisor-wechat-qr.png" alt="课程顾问微信二维码"
+                     onError={(e) => { e.currentTarget.style.display='none'; }} />
+                <div className="spec">（演示二维码 · 生产环境由运营配置真实顾问码）</div>
+              </div>
+              <div className="bdg b-pending" style={{ display:'inline-block', margin:'4px 0 18px' }}>pending_review · 运营核对到账中</div>
               <button className="btn btn-fill btn-lg" style={{ width:'100%' }} onClick={() => { onClose(); location.hash = '#/member'; }}>看我的订单</button>
               <button className="btn btn-line btn-lg" style={{ width:'100%', marginTop:10 }} onClick={() => { onClose(); if (onAdminJump) onAdminJump(); }}>（演示）以运营身份核销</button>
             </>
@@ -72,7 +81,7 @@ export function PayModal({ course, onClose, onAdminJump }) {
                 </div>
               </div>
               <button className="btn btn-fill btn-lg" style={{ width:'100%', marginTop:20 }} onClick={markPaid}>我已完成支付</button>
-              <div className="spec">第一层：点「已支付」后订单进 pending_review，运营对照工行流水人工核销，核销后自动发课程顾问微信码。自动核销留 V1.1。</div>
+              <div className="spec">spec §8.3：点「已支付」后系统立即把课程顾问微信码发给你，主动加好友可缩短感知等待；运营核对到账后只更新订单状态为 verified。</div>
             </>
           )}
 

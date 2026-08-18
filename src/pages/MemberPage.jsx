@@ -1,20 +1,28 @@
-// 个人中心：orders / profile / Token Hub intents
+// 个人中心：spec v1.1 §7.10 + §16
+// - 16.1 拆分为「行动轨迹」+「交易记录」两个子栏目
+// - 16.2 档案补 skill_tags / bio / social_links / resume_url（招聘板块展示用）
+// - 16.3 技能标签与课程标签复用同一套
 import React, { useState, useEffect } from 'react';
 import { useStore, useToast } from '../state/store';
 import { money } from '../utils/format';
 import { useRoute } from '../utils/router';
 import { dogUrl } from '../utils/constants';
 
-const TABS = [['orders','报名与订单'], ['profile','我的档案'], ['intents','Token Hub 意向']];
+const TABS = [
+  ['trail',  '行动轨迹'],
+  ['orders', '交易记录'],
+  ['profile','我的档案'],
+  ['intents','Token Hub 意向'],
+];
 
 export function MemberPage({ openLogin }) {
   const { session, orders, intents, mySignups, saveProfile, logout } = useStore();
   const toast = useToast();
   const { go } = useRoute();
-  const [tab, setTab] = useState('orders');
+  const [tab, setTab] = useState('trail');
 
   useEffect(() => {
-    if (!session.logged) setTab('orders');
+    if (!session.logged) setTab('trail');
   }, [session.logged]);
 
   const mine      = orders.filter((o) => o.user_email === session.email);
@@ -45,7 +53,7 @@ export function MemberPage({ openLogin }) {
       <div className="wrap">
         <div className="sec-h">
           <div><span className="kick">Member</span><h2 className="t2">个人中心</h2></div>
-          <p className="lead">报名信息一次填写写入档案，下次自动带出。</p>
+          <p className="lead">行动轨迹 + 交易记录 + 我的档案 · 信息一次填写写入档案，下次自动带出。</p>
         </div>
 
         <div className="subs">
@@ -56,7 +64,8 @@ export function MemberPage({ openLogin }) {
           ))}
         </div>
 
-        {tab === 'orders' && <OrdersTab mine={mine} signups={mySignup} />}
+        {tab === 'trail'   && <TrailTab signups={mySignup} />}
+        {tab === 'orders'  && <OrdersTab mine={mine} />}
         {tab === 'profile' && (
           <ProfileTab profile={session.profile} method={session.method} email={session.email}
                       saveProfile={saveProfile} logout={logout} toast={toast}
@@ -68,19 +77,15 @@ export function MemberPage({ openLogin }) {
   );
 }
 
-function OrdersTab({ mine, signups }) {
-  const openAdvisor = () => {
-    document.getElementById('payBody') || document.getElementById('formBody');
-    alert('（演示）顾问微信二维码占位');
-  };
-
+// spec §16.1 行动轨迹：我报名的课程/活动/黑客松、我投递的岗位、我的收藏
+function TrailTab({ signups }) {
   const STATUS_LABEL = { course:'课程', event:'活动', hackathon:'黑客松', job:'投递' };
 
-  if ((!mine.length) && (!signups.length)) {
+  if (!signups.length) {
     return (
       <div className="empty">
         <img src={dogUrl('dog-sleep')} alt="" />
-        还没有报名记录，去看看课程和黑客松吧
+        还没有行动记录，去看看课程和黑客松吧
         <br /><br />
         <button className="btn btn-fill" onClick={() => location.hash = '#/courses'}>浏览课程</button>
       </div>
@@ -89,90 +94,183 @@ function OrdersTab({ mine, signups }) {
 
   return (
     <>
-      {mine.length > 0 && (
-        <>
-          <span className="kick" style={{ marginBottom:14, display:'block' }}>Orders</span>
-          <div className="tbl-scroll">
-            <table className="t">
-              <tbody>
-                <tr><th>订单号</th><th>项目</th><th>金额</th><th>状态</th><th>顾问码</th></tr>
-                {mine.map((o) => (
-                  <tr key={o.id}>
-                    <td className="mono">{o.id}</td>
-                    <td>{o.item_title}</td>
-                    <td>¥{money(o.amount)}{o.is_deposit ? <span className="lo" style={{ marginLeft:6 }}>定金</span> : null}</td>
-                    <td>
-                      <span className={'bdg ' + (o.status === 'verified' ? 'b-verified' : o.status === 'failed' ? 'b-failed' : 'b-pending')}>{o.status}</span>
-                    </td>
-                    <td>
-                      {o.advisor_code_sent
-                        ? <button className="lnk" onClick={openAdvisor}>查看 →</button>
-                        : <span className="xs">核销后自动发</span>}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </>
-      )}
-
-      {signups.length > 0 && (
-        <>
-          <span className="kick" style={{ margin:'34px 0 14px', display:'block' }}>Signups</span>
-          <div className="tbl-scroll">
-            <table className="t">
-              <tbody>
-                <tr><th>类型</th><th>名称</th><th>时间</th><th>状态</th></tr>
-                {signups.map((s, i) => (
-                  <tr key={i}>
-                    <td>{STATUS_LABEL[s.kind] || s.kind}</td>
-                    <td>{s.title}</td>
-                    <td className="mono">{s.time}</td>
-                    <td><span className="bdg b-verified">{s.status}</span></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </>
-      )}
+      <span className="kick" style={{ marginBottom:14, display:'block' }}>Trail · 按时间倒序</span>
+      <div className="tbl-scroll">
+        <table className="t">
+          <tbody>
+            <tr><th>类型</th><th>名称</th><th>时间</th><th>状态</th></tr>
+            {signups.map((s, i) => (
+              <tr key={i}>
+                <td>{STATUS_LABEL[s.kind] || s.kind}</td>
+                <td>{s.title}</td>
+                <td className="mono">{s.time}</td>
+                <td><span className="bdg b-verified">{s.status}</span></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </>
   );
 }
 
-function ProfileTab({ profile, method, email, saveProfile, logout, toast, onAfterLogout }) {
+// spec §16.1 交易记录：订单号、金额、状态、支付方式、对应课程/活动名称 · 支持导出
+function OrdersTab({ mine }) {
+  const exportCsv = () => {
+    if (!mine.length) return;
+    const headers = ['订单号','项目','金额','支付方式','状态','顾问码','创建时间'];
+    const rows = mine.map((o) => [
+      o.id, o.item_title, o.amount, o.channel,
+      o.status, o.advisor_code_sent ? '已发' : '未发', o.created_at,
+    ]);
+    const csv = [headers, ...rows].map((r) => r.join(',')).join('\n');
+    const blob = new Blob([csv], { type:'text/csv;charset=utf-8' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `transactions-${new Date().toISOString().slice(0,10)}.csv`;
+    a.click();
+  };
+
+  if (!mine.length) {
+    return (
+      <div className="empty">
+        <img src={dogUrl('dog-sleep')} alt="" />
+        还没有交易记录，付费课程会在支付后出现
+      </div>
+    );
+  }
+
   return (
-    <div className="fcard" style={{ maxWidth:520 }}>
-      <div className="fr"><label>登录方式</label><input value={method} disabled /></div>
-      <div className="fr"><label>邮箱</label><input value={email} disabled /></div>
+    <>
+      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:14 }}>
+        <span className="kick">Transactions · {mine.length} 笔</span>
+        <button className="btn btn-line btn-sm" onClick={exportCsv}>导出 CSV</button>
+      </div>
+      <div className="tbl-scroll">
+        <table className="t">
+          <tbody>
+            <tr>
+              <th>订单号</th><th>项目</th><th>金额</th><th>支付方式</th><th>状态</th><th>顾问码</th>
+            </tr>
+            {mine.map((o) => (
+              <tr key={o.id}>
+                <td className="mono">{o.id}</td>
+                <td>{o.item_title}</td>
+                <td>¥{money(o.amount)}{o.is_deposit ? <span className="lo" style={{ marginLeft:6 }}>定金</span> : null}</td>
+                <td><span className="xs">工行聚合</span></td>
+                <td>
+                  <span className={'bdg ' + (o.status === 'verified' ? 'b-verified' : o.status === 'failed' ? 'b-failed' : 'b-pending')}>{o.status}</span>
+                </td>
+                <td>
+                  {o.advisor_code_sent
+                    ? <button className="lnk" onClick={() => alert('（演示）顾问微信二维码占位')}>查看 →</button>
+                    : <span className="xs">未发放</span>}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </>
+  );
+}
+
+// spec §16.2 个人信息完善：基础 / 自我介绍 / 简历 / 社交媒体 / 技能标签
+function ProfileTab({ profile, method, email, saveProfile, logout, toast, onAfterLogout }) {
+  const [skillInput, setSkillInput] = useState('');
+  const profile2 = profile || {};
+  const tags = Array.isArray(profile2.skill_tags) ? profile2.skill_tags : [];
+  const social = profile2.social_links || {};
+
+  const addTag = () => {
+    const v = skillInput.trim();
+    if (!v) return;
+    if (tags.includes(v)) { setSkillInput(''); return; }
+    if (tags.length >= 8) { toast.show('最多 8 个标签'); return; }
+    saveProfile({ skill_tags: [...tags, v] });
+    setSkillInput('');
+  };
+
+  const removeTag = (t) => {
+    saveProfile({ skill_tags: tags.filter((x) => x !== t) });
+  };
+
+  return (
+    <div className="fcard" style={{ maxWidth:640 }}>
+      <div className="spec">基础信息 · 通用</div>
+      <div className="fr"><label>登录方式</label><input value={method || ''} disabled /></div>
+      <div className="fr"><label>邮箱</label><input value={email || ''} disabled /></div>
       <div className="fr"><label>姓名</label>
-        <input id="pf-name" defaultValue={profile.name} placeholder="报名时自动带出" />
+        <input id="pf-name" defaultValue={profile2.name} placeholder="报名时自动带出" />
       </div>
       <div className="fr"><label>手机号</label>
-        <input id="pf-phone" defaultValue={profile.phone} placeholder="仅活动通知用" />
+        <input id="pf-phone" defaultValue={profile2.phone} placeholder="仅活动通知用" />
       </div>
       <div className="fr"><label>所在城市</label>
-        <input id="pf-city" defaultValue={profile.city} placeholder="线下活动报名时带出" />
+        <input id="pf-city" defaultValue={profile2.city} placeholder="线下活动报名时带出" />
+      </div>
+
+      <div className="spec" style={{ marginTop:24 }}>招聘板块展示 · 可选</div>
+      <div className="fr"><label>自我介绍</label>
+        <textarea id="pf-bio" rows="3" defaultValue={profile2.bio} placeholder="一段话介绍你自己（招聘板块展示）" />
+      </div>
+      <div className="fr"><label>简历链接</label>
+        <input id="pf-resume" defaultValue={profile2.resume_url} placeholder="https://（可选，仅用于求职场景）" />
       </div>
       <div className="fr"><label>GitHub</label>
-        <input id="pf-github" defaultValue={profile.github} placeholder="黑客松与投递时带出" />
+        <input id="pf-github" defaultValue={social.github} placeholder="github.com/yourname" />
       </div>
-      <button className="btn btn-fill btn-lg" style={{ width:'100%', marginTop:10 }} onClick={() => {
+      <div className="fr"><label>X (Twitter)</label>
+        <input id="pf-x" defaultValue={social.x} placeholder="x.com/yourname" />
+      </div>
+      <div className="fr"><label>Telegram</label>
+        <input id="pf-tg" defaultValue={social.telegram} placeholder="@yourname" />
+      </div>
+      <div className="fr"><label>LinkedIn</label>
+        <input id="pf-li" defaultValue={social.linkedin} placeholder="linkedin.com/in/yourname" />
+      </div>
+
+      <div className="spec" style={{ marginTop:24 }}>技能标签 · 最多 8 个 · 与课程标签共用同一套</div>
+      <div className="tags-row">
+        {tags.map((t) => (
+          <span key={t} className="tag with-x">#{t}<button onClick={() => removeTag(t)}>×</button></span>
+        ))}
+        <input
+          id="pf-skill"
+          placeholder="如 Solidity / LangChain / 社区运营"
+          value={skillInput}
+          onChange={(e) => setSkillInput(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addTag(); } }}
+          style={{ width:240 }}
+        />
+        <button className="btn btn-line btn-sm" onClick={addTag}>添加</button>
+      </div>
+
+      <button className="btn btn-fill btn-lg" style={{ width:'100%', marginTop:18 }} onClick={() => {
         saveProfile({
-          name:   document.getElementById('pf-name').value,
-          phone:  document.getElementById('pf-phone').value,
-          city:   document.getElementById('pf-city').value,
-          github: document.getElementById('pf-github').value,
+          name:     document.getElementById('pf-name').value,
+          phone:    document.getElementById('pf-phone').value,
+          city:     document.getElementById('pf-city').value,
+          bio:      document.getElementById('pf-bio').value,
+          resume_url: document.getElementById('pf-resume').value,
+          social_links: {
+            github:   document.getElementById('pf-github').value,
+            x:        document.getElementById('pf-x').value,
+            telegram: document.getElementById('pf-tg').value,
+            linkedin: document.getElementById('pf-li').value,
+          },
         });
-        toast.show('档案已保存，下次报名自动带出');
+        toast.show('档案已保存 · 招聘板块将同步展示公开字段');
       }}>保存</button>
       <button className="btn btn-line btn-lg" style={{ width:'100%', marginTop:10 }} onClick={() => {
         logout();
         toast.show('已退出登录');
         onAfterLogout();
       }}>退出登录</button>
-      <div className="spec">UserProfile.extensions：event_intake / hackathon_intake 等场景字段按需扩展，不在注册环节收集。</div>
+
+      <div className="spec" style={{ marginTop:14 }}>
+        隐私说明：手机号 / 邮箱仅对运营与审核可见；公开档案仅展示你主动填写的字段（招聘人才信息场景）。
+      </div>
     </div>
   );
 }

@@ -129,3 +129,28 @@ table.t tr:last-child td{border-bottom:none;}
 .fr input,.fr select,.fr textarea{width:100%;border:none;border-bottom:1px solid var(--line);border-radius:0;padding:9px 0;font-size:14.5px;outline:none;background:transparent;color:var(--ink);transition:.2s;}
 .fr input:focus,.fr select:focus,.fr textarea:focus{border-bottom-color:var(--ink);}
 .fr .hint{font-size:11.5px;color:var(--ink-3);margin-top:7px;}
+
+/* spec v1.1 §7.1.1 自定义标签（与 §7.1.2 不冲突，仅展示） */
+.c-tags{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 -2px;}
+.tag{font-family:var(--f-mono);font-size:10.5px;letter-spacing:.04em;color:var(--ink-3);
+     padding:2px 7px;border:1px solid var(--line-2);border-radius:999px;background:var(--paper-2);}
+
+/* spec §16.2 技能标签输入行 */
+.tags-row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:6px 0 4px;}
+.tag.with-x{display:inline-flex;align-items:center;gap:6px;}
+.tag.with-x button{border:none;background:transparent;cursor:pointer;color:var(--ink-3);font-size:13px;line-height:1;padding:0;}
+.tag.with-x button:hover{color:var(--ink);}
+
+/* spec §14 运营后台组件 */
+.card-ops{padding:20px;border:1px solid var(--line-2);border-radius:14px;background:var(--paper);}
+.card-ops h4{margin:0 0 6px;font-size:15px;font-weight:660;}
+.card-ops p{margin:0 0 14px;color:var(--ink-3);font-size:13px;}
+.hr-soft{border:none;border-top:1px solid var(--line-2);margin:24px 0;}
+.ck{display:inline-flex;align-items:center;gap:8px;cursor:pointer;}
+.ck input{width:16px;height:16px;}
+.fields-cfg{display:flex;flex-wrap:wrap;gap:8px;align-items:center;}
+.field-chip{font-family:var(--f-mono);font-size:11.5px;padding:4px 10px;border:1px solid var(--line-2);border-radius:999px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;}
+.field-chip.required{background:var(--ink);color:var(--paper);border-color:var(--ink);}
+.field-chip input{accent-color:var(--paper);}
+.pills-label{font-family:var(--f-mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3);align-self:center;margin-right:4px;}
+.subs.scroll-x{overflow-x:auto;flex-wrap:nowrap;}

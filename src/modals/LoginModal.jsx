@@ -1,4 +1,7 @@
-// 登录弹层：三选一 → 邮箱 OTP / 微信扫码 / 钱包签名
+// 登录弹层：spec v1.1 §6
+// - §6.1 邮箱验证码（主力）/ 微信扫码 / Web3 钱包
+// - §6.2 新增 GitHub 登录（P1 提升）· 海外开发者/求职者复用招聘板块身份验证
+// - 强调零填表：不收手机号、不实名、不填职业公司
 import React, { useState, useEffect, useRef } from 'react';
 import { useStore, useToast } from '../state/store';
 
@@ -18,8 +21,8 @@ export function LoginModal({ open, afterLogin, onClose }) {
 
   if (!open) return null;
 
-  const doLogin = (method, em) => {
-    login(method, em);
+  const doLogin = (method, em, extras) => {
+    login(method, em, extras);
     toast.show(`已用「${method}」登录 · ${em}`);
     onClose();
     if (afterLogin) setTimeout(afterLogin, 320);
@@ -46,14 +49,22 @@ export function LoginModal({ open, afterLogin, onClose }) {
           {step === 'choose' && (
             <>
               <h2 style={{ fontSize:26 }}>进来看看</h2>
-              <p className="xs" style={{ margin:'12px 0 28px' }}>三选一，几秒完成。不要手机号、不要实名、不填公司职业。</p>
+              <p className="xs" style={{ margin:'12px 0 22px' }}>零填表 · 不收手机号、不实名、不填职业公司。</p>
+
               <button className="lm" onClick={() => setStep('email')}>
                 邮箱验证码<span className="bg">本周主力</span>
               </button>
+
               <button className="lm" onClick={() => doLogin('微信', 'wx_user@tintin.land')}>
                 微信一键登录<span className="bg">UI 就绪</span>
               </button>
+
+              <button className="lm" onClick={() => doLogin('GitHub', 'gh_user@tintin.land', { profile: { github: 'github.com/gh_user' } })}>
+                GitHub 登录<span className="bg">P1 · 招聘复用</span>
+              </button>
+
               <div className="wl">或 <a onClick={() => doLogin('Web3 钱包', '0x7a3f…9c2b')}>用钱包签名登录</a></div>
+
               <div className="spec">签名一次即可，不转账、无 gas。职业公司等信息延后到报名场景再收集。</div>
             </>
           )}

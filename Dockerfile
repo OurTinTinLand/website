@@ -83,8 +83,10 @@ COPY backend/pb_migrations /pb/migrations
 COPY start.sh /start.sh
 RUN chmod +x /start.sh
 
-# 数据持久化（Railway Volume 挂载）
-VOLUME ["/pb_data"]
+# 数据持久化：Railway 不支持 Dockerfile 里的 VOLUME 指令。
+# 部署时在 Railway Dashboard → Service → Settings → Volumes 挂一个 Volume
+# 到容器内的 /pb_data（或任何你想用的路径），通过环境变量 PB_DATA 注入。
+# 本地 docker run 时手动 -v $PWD/backend/pb_data:/pb_data 挂载。
 
 # 端口：外部 PORT（Railway 注入，默认 3000）+ 内部 PB_PORT（不暴露）
 ENV PORT=3000

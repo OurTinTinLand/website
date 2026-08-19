@@ -1,15 +1,24 @@
-# 后端 PB 服务的独立部署配置（仅当切回分离架构时使用）
-# 统一镜像（./Dockerfile）已包含 PB，所以 Railway 单 service 部署时不需要这个文件。
+# ============================================================
+# 后端 PB 服务（独立部署，仅当切回分离架构时使用）
+# ------------------------------------------------------------
+# 统一镜像（./Dockerfile）已包含 PB，Railway 单 service 部署时不需要这个文件。
 # 切回分离部署：把这里的 dockerfilePath 用于 PB service，
 #               把 railway.toml 的 dockerfilePath 改成 "Dockerfile.frontend"
+#
+# Volume 同样用 [[deploy.volumes]] 声明，PB 数据存到 /pb_data
+# ============================================================
 
 [build]
 builder = "DOCKERFILE"
 dockerfilePath = "Dockerfile.backend"
 
 [deploy]
-startCommand = "/pb/pocketbase serve --http=0.0.0.0:${PORT} --dir=/pb_data --hooksDir=/pb/hooks --migrationsDir=/pb/migrations --hooksWatch=false"
+startCommand = "sh -c \"/pb/pocketbase serve --http=0.0.0.0:${PORT} --dir=${PB_DATA:-/pb_data} --hooksDir=/pb/hooks --migrationsDir=/pb/migrations --hooksWatch=false\""
 healthcheckPath = "/api/health"
 healthcheckTimeout = 30
 restartPolicyType = "ON_FAILURE"
 restartPolicyMaxRetries = 10
+
+[[deploy.volumes]]
+mountPath = "/pb_data"
+name = "pb-data"

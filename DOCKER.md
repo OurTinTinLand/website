@@ -48,13 +48,16 @@ docker run --rm -p 3000:3000 \
 docker build -f Dockerfile.frontend -t tintinland-web .
 docker run --rm -p 3000:3000 -e PORT=3000 tintinland-web
 
-# 后端
+# 后端（注意：必须 -v 挂载，否则 PB 数据每次重启清零）
 docker build -f Dockerfile.backend -t tintinland-pb .
 docker run --rm -p 8090:8090 \
   -e PORT=8090 \
   -v $PWD/backend/pb_data:/pb_data \
   tintinland-pb
 ```
+
+> Railway 上分离部署：把 `railway.toml` 的 `dockerfilePath` 改成 `Dockerfile.frontend`，
+> 另起一个 Service 用 `railway.backend.toml`（也含 `[[deploy.volumes]]` 声明）。
 
 **架构**：
 
@@ -103,13 +106,24 @@ PORT=8123 PB_URL=http://127.0.0.1:8090 node server.js
 
 1. **创建项目** → New Project → Deploy from GitHub repo
 2. **自动检测** `Dockerfile`（默认就是 `Dockerfile` = 统一镜像）
-3. **添加 Volume** → 挂 `/pb_data` 到一个 Volume（生产数据持久化）
+3. **Volume 声明**已在 `railway.toml` 里通过 `[[deploy.volumes]]` 完成：
+   ```toml
+   [[deploy.volumes]]
+   mountPath = "/pb_data"
+   name = "pb-data"
+   ```
+   Railway 部署时自动建一个名为 `pb-data` 的 Volume，容器内挂到 `/pb_data`。
+   ⚠️ **不要在 Dockerfile 里写 `VOLUME` 指令** — Railway build 会报错：
+   `docker VOLUME at line X is not supported, use Railway Volumes`。
 4. **自动注入** `PORT`，无需额外配置
 5. **验证**：
    - `https://<your-app>.up.railway.app/` → 看到官网首页
-   - `https://<your-app>.up.railway.app/api/health` → `{"message":"API is healthy."}`
+   - `https://<your-app>.up.railway.app/api/health` → `{"message":"API ishealthy."}`
    - `https://<your-app>.up.railway.app/api/collections/courses/records` → 课程数据
    - `https://<your-app>.up.railway.app/_/` → PB 管理后台
+
+> Volume 数据会在每次 deploy 时保留（PB 自动跑 migrations 创建表结构）。
+> 删除 Volume 会清空所有数据，谨慎操作。
 
 ## 镜像大小
 

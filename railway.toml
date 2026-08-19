@@ -1,10 +1,15 @@
 # ============================================================
-# Railway 服务配置 · 推荐用统一镜像（前端 + PB）
+# Railway 服务配置 · 统一镜像（前端 + PB，单 PORT 单 service）
 # ------------------------------------------------------------
 # 单 Service 部署：
 #   - Web + 后端 PB 共容器、单 PORT（Railway 注入）
-#   - 省钱：1 个 service = 1 个最小实例
-#   - 省事：内部走 localhost，零网络配置
+#   - 1 个 service = 1 个最小实例
+#   - 内部走 localhost，零网络配置
+#
+# Volume：
+#   - Railway 不支持 Dockerfile 里的 VOLUME 指令
+#   - 改成这里 [[deploy.volumes]] 声明
+#   - /pb_data 在容器内挂到名为 "pb-data" 的 Railway Volume（持久化 PocketBase）
 #
 # 切到分离部署：把 dockerfilePath 改成 "Dockerfile.frontend"，
 #   然后另起一个 service 用 Dockerfile.backend + railway.backend.toml
@@ -20,3 +25,7 @@ healthcheckPath = "/api/health"
 healthcheckTimeout = 30
 restartPolicyType = "ON_FAILURE"
 restartPolicyMaxRetries = 10
+
+[[deploy.volumes]]
+mountPath = "/pb_data"
+name = "pb-data"

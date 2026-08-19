@@ -39,8 +39,10 @@ COPY backend/pb_hooks /pb/hooks
 # 拷贝 migrations（spec v1.1 schema 变更）
 COPY backend/pb_migrations /pb/migrations
 
-# 数据持久化路径（Railway Volume 挂到这里）
-VOLUME ["/pb_data"]
+# 数据持久化：Railway 不支持 Dockerfile 里的 VOLUME 指令。
+# 部署时在 Railway Dashboard → Service → Settings → Volumes 挂一个 Volume
+# 到容器内的 /pb_data（或任何你想用的路径），通过环境变量 PB_DATA 注入。
+# 本地 docker run 时手动 -v $PWD/backend/pb_data:/pb_data 挂载。
 
 # Railway 注入 PORT；本地 docker run 时手动 -e PORT=8090
 ENV PORT=8090

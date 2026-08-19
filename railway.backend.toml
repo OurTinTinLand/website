@@ -1,0 +1,14 @@
+# 后端 PB 服务配置（添加 Service 时把这个文件作为 railway.toml）
+# Railway Dashboard → New Service → "Add from Repo" 时会自动检测 railway.toml
+# 如果多个 Service 都引用同一个 repo，需要在每个 Service 的 Settings → Service Root
+#   指定不同的 root（或用 monorepo path）
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "Dockerfile.backend"
+
+[deploy]
+startCommand = "/pb/pocketbase serve --http=0.0.0.0:${PORT} --dir=/pb_data --hooksDir=/pb/hooks --migrationsDir=/pb/migrations --hooksWatch=false"
+healthcheckPath = "/api/health"
+healthcheckTimeout = 30
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 10

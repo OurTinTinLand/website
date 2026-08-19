@@ -1,0 +1,53 @@
+# ---- 依赖与构建产物 ----
+node_modules
+dist
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# ---- VCS / IDE ----
+.git
+.gitignore
+.github
+.idea
+.vscode
+.claude
+.DS_Store
+*.swp
+*.swo
+
+# ---- spec 文档（运行时不需）----
+spec
+
+# ---- Adobe Illustrator / PDF 设计源 ----
+*.ai
+*.pdf
+/tintin_dog.ai
+/tintin_dog.pdf
+/tintin_dog.png
+/tintin_white_circle.png
+/tintin_shirt_0715.ai
+/Tintin new cover.ai
+/Tintin小狗.ai
+
+# ---- 独立子项目 / 临时 ----
+tintin-pet-run
+$TMPDIR
+
+# ---- env / 凭证 ----
+.env
+.env.*
+
+# ---- 后端 PocketBase 数据/二进制（运行时不需要打进镜像）----
+# 注意：保留 backend/pb_hooks 和 backend/pb_migrations 供 Dockerfile.backend 使用
+backend/pb_data
+backend/pb_data.*
+backend/pb_public
+backend/pocketbase
+backend/README.md
+backend/api.md
+backend/pb-client.js
+backend/start.sh
+backend/pb.log
+backend/pb_data.bak*

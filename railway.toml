@@ -1,0 +1,23 @@
+# ============================================================
+# Railway 服务配置
+# ------------------------------------------------------------
+# 单仓库多服务：在 Railway Dashboard 添加两个 Service，
+# 1. Web 前端  → Dockerfile = "Dockerfile"
+# 2. 后端 PB   → Dockerfile = "Dockerfile.backend"
+#
+# 每个 Service 的环境变量在 Dashboard 配置：
+#   Web:  无需配置（Railway 自动注入 PORT）
+#   PB:   PORT=8090（可选，会被 Railway 注入的 PORT 覆盖）
+# ============================================================
+
+# Web 服务默认配置
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "Dockerfile"
+
+[deploy]
+startCommand = "node server.js"
+healthcheckPath = "/"
+healthcheckTimeout = 30
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 10

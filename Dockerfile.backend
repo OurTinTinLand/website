@@ -1,0 +1,54 @@
+# syntax=docker/dockerfile:1.7
+# ============================================================
+# TinTinLand · PocketBase 后端服务（Railway 独立 Service）
+# ------------------------------------------------------------
+# 单独 Railway Service，监听注入的 PORT。
+# 数据持久化用 Railway Volume 挂载到 /pb_data。
+#
+# 本地构建/运行：
+#   docker build -f Dockerfile.backend -t tintinland-pb .
+#   docker run --rm -p 8090:8090 \
+#     -e PORT=8090 \
+#     -v $PWD/backend/pb_data:/pb_data \
+#     tintinland-pb
+# ============================================================
+FROM alpine:3.20
+
+ARG PB_VERSION=0.27.2
+ARG TARGETARCH=amd64
+
+# 下载 PocketBase 二进制（amd64 / arm64 自动）
+RUN apk add --no-cache ca-certificates unzip wget \
+ && case "${TARGETARCH}" in \
+      amd64) PB_ARCH="amd64" ;; \
+      arm64) PB_ARCH="arm64" ;; \
+      *) echo "unsupported arch: ${TARGETARCH}"; exit 1 ;; \
+    esac \
+ && wget -q "https://github.com/pocketbase/pocketbase/releases/download/v${PB_VERSION}/pocketbase_${PB_VERSION}_linux_${PB_ARCH}.zip" \
+   -O /tmp/pb.zip \
+ && unzip /tmp/pb.zip -d /pb \
+ && rm /tmp/pb.zip \
+ && chmod +x /pb/pocketbase \
+ && apk del wget unzip
+
+WORKDIR /pb
+ENV PB_DATA=/pb_data
+
+# 拷贝 hooks（spec v1.1 的 auth/ai_route/orders/intents/signups/guards）
+COPY backend/pb_hooks /pb/hooks
+# 拷贝 migrations（spec v1.1 schema 变更）
+COPY backend/pb_migrations /pb/migrations
+
+# 数据持久化路径（Railway Volume 挂到这里）
+VOLUME ["/pb_data"]
+
+# Railway 注入 PORT；本地 docker run 时手动 -e PORT=8090
+ENV PORT=8090
+EXPOSE ${PORT}
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
+  CMD wget --quiet --tries=1 --spider http://127.0.0.1:${PORT}/api/health || exit 1
+
+# shell 形式让 ${PORT} 展开；显式传入 dir/hooks/migrations
+# --automigrate (默认 true) 自动应用 /pb/migrations 下的 JS 迁移
+CMD sh -c "/pb/pocketbase serve --http=0.0.0.0:${PORT} --dir=${PB_DATA} --hooksDir=/pb/hooks --migrationsDir=/pb/migrations --hooksWatch=false"

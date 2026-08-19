@@ -1,7 +1,8 @@
-# 后端 PB 服务配置（添加 Service 时把这个文件作为 railway.toml）
-# Railway Dashboard → New Service → "Add from Repo" 时会自动检测 railway.toml
-# 如果多个 Service 都引用同一个 repo，需要在每个 Service 的 Settings → Service Root
-#   指定不同的 root（或用 monorepo path）
+# 后端 PB 服务的独立部署配置（仅当切回分离架构时使用）
+# 统一镜像（./Dockerfile）已包含 PB，所以 Railway 单 service 部署时不需要这个文件。
+# 切回分离部署：把这里的 dockerfilePath 用于 PB service，
+#               把 railway.toml 的 dockerfilePath 改成 "Dockerfile.frontend"
+
 [build]
 builder = "DOCKERFILE"
 dockerfilePath = "Dockerfile.backend"

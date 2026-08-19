@@ -1,0 +1,67 @@
+# syntax=docker/dockerfile:1.7
+# ============================================================
+# TinTinLand 新官网 · 仅前端 Web 服务
+# ------------------------------------------------------------
+# 单服务部署：仅前端。后端 (PocketBase) 走 Dockerfile.backend
+# 单独部署成另一个 Service，跨服务用 Railway 内部 DNS 通信。
+#
+# 也可使用统一镜像：见 ./Dockerfile（前端 + PB 共容器、单 PORT）。
+#
+# Railway 部署：
+#   1. Railway 启动容器时会注入 PORT（通常 3000 / 8080）
+#   2. CMD 直接读 process.env.PORT（server.js 已支持）
+#   3. EXPOSE $PORT 让 Railway 探测端口 + 配置健康检查
+#
+# 本地构建/运行：
+#   docker build -f Dockerfile.frontend -t tintinland-web .
+#   docker run --rm -p 3000:3000 -e PORT=3000 tintinland-web
+#   curl http://localhost:3000/
+# ============================================================
+
+# ---- Stage 1: 安装依赖 + esbuild 构建 ----
+FROM node:20-alpine AS builder
+WORKDIR /app
+
+# 先拷贝 manifest，最大化 Docker 层缓存
+COPY package.json package-lock.json* ./
+RUN npm ci --no-audit --no-fund
+
+# 再拷贝源码
+COPY . .
+
+# esbuild 把 src/App.jsx 编译成 dist/bundle.js
+# postbuild.js 把 esm.sh 的 React 引用替换为 window.React
+RUN npm run build
+
+# ---- Stage 2: 运行时（仅含必要产物）----
+FROM node:20-alpine AS runtime
+LABEL org.opencontainers.image.title="tintinland-web" \
+      org.opencontainers.image.description="TinTinLand 新官网 · React + esbuild 静态前端（仅前端）" \
+      org.opencontainers.image.source="https://github.com/tintinland/tintindog"
+
+WORKDIR /app
+ENV NODE_ENV=production
+
+# 1) 静态服务器本体（监听 process.env.PORT）
+COPY --from=builder /app/server.js ./server.js
+
+# 2) HTML 入口
+COPY --from=builder /app/index.html ./index.html
+
+# 3) esbuild 产物（含 inline sourcemap）
+COPY --from=builder /app/dist ./dist
+
+# 4) 前端运行时直接引用的静态资源
+COPY --from=builder /app/src/styles ./src/styles
+COPY --from=builder /app/assets-claude ./assets-claude
+
+# Railway 注入 PORT；本地 docker run 时手动 -e PORT=3000
+ENV PORT=3000
+EXPOSE ${PORT}
+
+# 健康检查：fetch / 应返回 2xx
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+  CMD node -e "fetch('http://127.0.0.1:'+process.env.PORT+'/').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+
+# 启动：Node 18+ 内置 fetch，所以 node:20-alpine 直接可用
+CMD ["node", "server.js"]

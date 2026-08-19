@@ -1,24 +1,34 @@
 # syntax=docker/dockerfile:1.7
 # ============================================================
-# TinTinLand 新官网 · 前端 Web 服务
+# TinTinLand 新官网 · 统一镜像（前端 + PocketBase）
 # ------------------------------------------------------------
-# 用途：
-#   - 把 src/App.jsx + index.html + 静态资源打包成可部署镜像
-#   - 监听 Railway 注入的 PORT 环境变量
-#   - 后端 (PocketBase) 作为独立 Railway Service 部署，参见 Dockerfile.backend
+# 单容器、单 PORT 部署：
+#   - Node server.js 监听 ${PORT}（Railway 注入），
+#     对 /api/* 与 /_/* 反向代理到容器内的 PocketBase
+#   - PocketBase 监听内部 ${PB_PORT}（默认 8090，不暴露公网）
+#   - tini 当 PID 1，负责信号转发与僵尸进程回收
 #
-# Railway 部署：
-#   1. Railway 启动容器时会注入 PORT（通常 3000 / 8080）
-#   2. CMD 直接读 process.env.PORT（server.js 已支持）
-#   3. EXPOSE $PORT 让 Railway 探测端口 + 配置健康检查
+# 与单服务镜像的区别：
+#   - Dockerfile.frontend + Dockerfile.backend：两个 Railway Service
+#   - 本 Dockerfile：一个 Railway Service，省钱省事
+#
+# Railway 部署（推荐这个，省一个 Service）：
+#   1. New Service → Dockerfile（默认指向本文件）
+#   2. Volume → /pb_data
+#   3. 自动注入 PORT，无需额外配置
 #
 # 本地构建/运行：
-#   docker build -t tintinland-web .
-#   docker run --rm -p 3000:3000 -e PORT=3000 tintinland-web
+#   docker build -t tintinland-all .
+#   docker run --rm -p 3000:3000 \
+#     -e PORT=3000 \
+#     -v $PWD/backend/pb_data:/pb_data \
+#     tintinland-all
 #   curl http://localhost:3000/
+#   curl http://localhost:3000/api/health   # 经 Node 代理
+#   curl http://localhost:3000/api/collections/courses/records
 # ============================================================
 
-# ---- Stage 1: 安装依赖 + esbuild 构建 ----
+# ---- Stage 1: 装 node + 构建前端 + 拉 PocketBase ----
 FROM node:20-alpine AS builder
 WORKDIR /app
 
@@ -33,35 +43,58 @@ COPY . .
 # postbuild.js 把 esm.sh 的 React 引用替换为 window.React
 RUN npm run build
 
-# ---- Stage 2: 运行时（仅含必要产物）----
-FROM node:20-alpine AS runtime
-LABEL org.opencontainers.image.title="tintinland-web" \
-      org.opencontainers.image.description="TinTinLand 新官网 · React + esbuild 静态前端" \
+# ---- Stage 2: 运行时（alpine 单一基础）----
+FROM alpine:3.20
+ARG PB_VERSION=0.27.2
+ARG TARGETARCH=amd64
+
+LABEL org.opencontainers.image.title="tintinland-all" \
+      org.opencontainers.image.description="TinTinLand 新官网 · 统一镜像（前端 + PocketBase 单 PORT）" \
       org.opencontainers.image.source="https://github.com/tintinland/tintindog"
 
+# 1) 系统包：nodejs（静态服务器）、npm、tini（PID 1）、wget（健康检查）、ca-certificates
+RUN apk add --no-cache nodejs npm tini wget ca-certificates
+
+# 2) 拉 PocketBase 二进制（amd64 / arm64 自动）
+RUN case "${TARGETARCH}" in \
+      amd64) PB_ARCH="amd64" ;; \
+      arm64) PB_ARCH="arm64" ;; \
+      *) echo "unsupported arch: ${TARGETARCH}"; exit 1 ;; \
+    esac \
+ && wget -q "https://github.com/pocketbase/pocketbase/releases/download/v${PB_VERSION}/pocketbase_${PB_VERSION}_linux_${PB_ARCH}.zip" \
+   -O /tmp/pb.zip \
+ && unzip /tmp/pb.zip -d /pb \
+ && rm /tmp/pb.zip \
+ && chmod +x /pb/pocketbase
+
+# 3) 前端构建产物（从 builder stage 拷过来）
 WORKDIR /app
-ENV NODE_ENV=production
-
-# 1) 静态服务器本体（监听 process.env.PORT）
-COPY --from=builder /app/server.js ./server.js
-
-# 2) HTML 入口
+COPY --from=builder /app/server.js  ./server.js
 COPY --from=builder /app/index.html ./index.html
-
-# 3) esbuild 产物（含 inline sourcemap）
-COPY --from=builder /app/dist ./dist
-
-# 4) 前端运行时直接引用的静态资源
+COPY --from=builder /app/dist       ./dist
 COPY --from=builder /app/src/styles ./src/styles
 COPY --from=builder /app/assets-claude ./assets-claude
 
-# Railway 注入 PORT；本地 docker run 时手动 -e PORT=3000
+# 4) 后端 hooks + migrations
+COPY backend/pb_hooks      /pb/hooks
+COPY backend/pb_migrations /pb/migrations
+
+# 5) 启动脚本
+COPY start.sh /start.sh
+RUN chmod +x /start.sh
+
+# 数据持久化（Railway Volume 挂载）
+VOLUME ["/pb_data"]
+
+# 端口：外部 PORT（Railway 注入，默认 3000）+ 内部 PB_PORT（不暴露）
 ENV PORT=3000
+ENV PB_PORT=8090
 EXPOSE ${PORT}
 
-# 健康检查：fetch / 应返回 2xx
-HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-  CMD node -e "fetch('http://127.0.0.1:'+process.env.PORT+'/').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+# 健康检查：经 Node 代理到 PB /api/health
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+  CMD wget --quiet --tries=1 --spider "http://127.0.0.1:${PORT}/api/health" || exit 1
 
-# 启动：Node 18+ 内置 fetch，所以 node:20-alpine 直接可用
-CMD ["node", "server.js"]
+# tini 处理信号 + 僵尸进程
+ENTRYPOINT ["/sbin/tini", "--"]
+CMD ["/start.sh"]

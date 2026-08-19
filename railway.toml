@@ -1,23 +1,22 @@
 # ============================================================
-# Railway 服务配置
+# Railway 服务配置 · 推荐用统一镜像（前端 + PB）
 # ------------------------------------------------------------
-# 单仓库多服务：在 Railway Dashboard 添加两个 Service，
-# 1. Web 前端  → Dockerfile = "Dockerfile"
-# 2. 后端 PB   → Dockerfile = "Dockerfile.backend"
+# 单 Service 部署：
+#   - Web + 后端 PB 共容器、单 PORT（Railway 注入）
+#   - 省钱：1 个 service = 1 个最小实例
+#   - 省事：内部走 localhost，零网络配置
 #
-# 每个 Service 的环境变量在 Dashboard 配置：
-#   Web:  无需配置（Railway 自动注入 PORT）
-#   PB:   PORT=8090（可选，会被 Railway 注入的 PORT 覆盖）
+# 切到分离部署：把 dockerfilePath 改成 "Dockerfile.frontend"，
+#   然后另起一个 service 用 Dockerfile.backend + railway.backend.toml
 # ============================================================
 
-# Web 服务默认配置
 [build]
 builder = "DOCKERFILE"
 dockerfilePath = "Dockerfile"
 
 [deploy]
-startCommand = "node server.js"
-healthcheckPath = "/"
+startCommand = "/start.sh"
+healthcheckPath = "/api/health"
 healthcheckTimeout = 30
 restartPolicyType = "ON_FAILURE"
 restartPolicyMaxRetries = 10

@@ -17,7 +17,8 @@ import { AdminPage } from './pages/AdminPage';
 import { NotFoundPage } from './pages/NotFoundPage';
 import { AuthLoginPage, AuthCallbackPage } from './pages/AuthPages';
 
-import { courses, events, hackathons, jobs } from './data/index.js';
+// catalog 走 store（PB 加载），data/* 仅作 seed fallback
+import { courses as seedCourses, events as seedEvents, hackathons as seedHackathons, jobs as seedJobs } from './data/index.js';
 
 import { DetailModal } from './modals/DetailModal';
 import { LoginModal } from './modals/LoginModal';
@@ -26,12 +27,18 @@ import { PayModal } from './modals/PayModal';
 
 function Shell() {
   const { page, detailId, go } = useRoute();
-  const { session, demoAdmin } = useStore();
+  const { session, demoAdmin, catalog } = useStore();
 
   const [loginOpen,  setLoginOpen]  = useState(false);
   const [loginAfter, setLoginAfter] = useState(null);
   const [formDef,    setFormDef]    = useState(null);
   const [payCourseId, setPayCourseId] = useState(null);
+
+  // 优先用 PB 加载的 catalog，降级到 seed
+  const courses    = catalog?.courses    ?? seedCourses;
+  const events     = catalog?.events     ?? seedEvents;
+  const hackathons = catalog?.hackathons ?? seedHackathons;
+  const jobs       = catalog?.jobs       ?? seedJobs;
 
   const openLogin  = (after) => { setLoginAfter(() => after || null); setLoginOpen(true); };
   const closeLogin = () => setLoginOpen(false);

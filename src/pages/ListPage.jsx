@@ -1,9 +1,8 @@
 // 列表页：课程 / 活动 / 黑客松 / 招聘 / 应用工具
-// spec §7.1.1 课程支持二级子类筛选；tags 不作为筛选入口（spec §7.1.1）
+// spec v1.1 §7.1.1 课程支持二级子类筛选；tags 不作为筛选入口（spec §7.1.1）
+// V1.1 真实接入：catalog 从 store 取（PB 优先 → seed fallback）
 import React, { useState, useMemo, useEffect } from 'react';
-import { courses, events, hackathons, JOB_ROLES, EVENT_TAGS, COURSE_CATEGORIES } from '../data/index.js';
-import { jobs } from '../data/jobs.js';
-import { apps } from '../data/apps.js';
+import { useStore } from '../state/store';
 import { stateOf, dogUrl } from '../utils/constants';
 import { ListFilters } from '../components/ListFilters';
 import { Card } from '../components/Card';
@@ -13,18 +12,26 @@ import { AppCard } from '../components/AppCard';
 const META = {
   courses:    { kick:'Courses',    title:'课程',     desc:'AI 应用 / AI Agent·FDE / AI 短剧 / Web3 技术（Web3 展开 6 子类）。状态按时间自动判断。' },
   events:     { kick:'Events',     title:'活动',     desc:'Meetup / AMA / Workshop / 中国行与全球行。内容型运营，与竞赛型的黑客松分开管理。' },
-  hackathons: { kick:'Hackathons', title:'黑客松',   desc:'奖金池、赛道、评审标准、组队报名。字段结构与活动完全不同，所以独立成板块。' },
+  hackathons: { kick:'Hackathons', title:'黑客松',   desc:'奖金池、赛道、评审标准、组队报名。字段结构与活动完全不同，因此独立成板块。' },
   jobs:       { kick:'Careers',    title:'招聘',     desc:'自有岗位 + 生态伙伴岗位 + 社区人才信息。数量不追求多，挂出来的都在真招。' },
   apps:       { kick:'Apps',       title:'应用工具', desc:'代理产品（云厂商代理，主推）+ 社区作品（社区自研，曝光用）。',
                 extraBanner: '本周目标是占位页：卡片结构与上架表单完整，真实产品数据由运营上线后补，不阻塞主线。',
                 extraAction: ['申请上架', 'app'] },
 };
 
-const DATA = { courses, events, hackathons, jobs, apps };
-
 export function ListPage({ kind, onOpen, onApply, onConsult }) {
   const meta = META[kind];
-  const all = DATA[kind];
+  const { catalog } = useStore();
+
+  // 数据源：PB catalog 优先，seed fallback
+  const all = useMemo(() => {
+    if (kind === 'courses') return catalog?.courses ?? [];
+    if (kind === 'events')  return catalog?.events ?? [];
+    if (kind === 'hackathons') return catalog?.hackathons ?? [];
+    if (kind === 'jobs')    return catalog?.jobs ?? [];
+    if (kind === 'apps')    return catalog?.apps ?? [];
+    return [];
+  }, [catalog, kind]);
 
   const [filter, setFilter] = useState(
     kind === 'jobs' || kind === 'apps'
@@ -32,25 +39,20 @@ export function ListPage({ kind, onOpen, onApply, onConsult }) {
       : { st:'all', cat:'all', sub:'all', src:'all' }
   );
 
-  // 分类筛选候选：每个 kind 用 spec §7 中定义的枚举
   const cats = useMemo(() => {
     if (kind === 'apps')     return ['代理产品','社区作品'];
-    if (kind === 'courses')  return COURSE_CATEGORIES;
-    if (kind === 'events')   return EVENT_TAGS;
-    if (kind === 'jobs')     return JOB_ROLES;
-    if (kind === 'hackathons') {
-      return [...new Set(all.map((x) => x.theme))];
-    }
+    if (kind === 'courses')  return ['AI 应用','AI Agent·FDE','AI 短剧','Web3 技术'];
+    if (kind === 'events')   return [...new Set(all.map((x) => x.tag).filter(Boolean))];
+    if (kind === 'jobs')     return [...new Set(all.map((x) => x.role).filter(Boolean))];
+    if (kind === 'hackathons') return [...new Set(all.map((x) => x.theme).filter(Boolean))];
     return [];
   }, [kind, all]);
 
   const items = useMemo(() => {
     return all.filter((x) => {
-      // 状态
       if (filter.st && filter.st !== 'all') {
         if (stateOf(x.start_at, x.end_at) !== filter.st) return false;
       }
-      // 一级分类
       if (filter.cat && filter.cat !== 'all') {
         if (kind === 'apps') {
           if (filter.cat === '代理产品' && x.type !== 'agency') return false;
@@ -65,11 +67,9 @@ export function ListPage({ kind, onOpen, onApply, onConsult }) {
           if (x.theme !== filter.cat) return false;
         }
       }
-      // 二级子类（仅课程 + 仅 Web3 技术）
       if (kind === 'courses' && filter.sub && filter.sub !== 'all' && x.category === 'Web3 技术') {
         if (x.subcategory !== filter.sub) return false;
       }
-      // 来源
       if (filter.src && filter.src !== 'all' && x.content_source !== filter.src) return false;
       return true;
     });
@@ -97,6 +97,10 @@ export function ListPage({ kind, onOpen, onApply, onConsult }) {
 
         {meta.extraBanner && (
           <div className="banner"><span>ℹ</span><div>{meta.extraBanner}</div></div>
+        )}
+
+        {catalog?._source === 'fallback' && (
+          <div className="banner"><span>ℹ</span><div>当前为种子数据 · 后端 PB 未连接</div></div>
         )}
 
         <ListFilters kind={kind} filter={filter} setFilter={setFilter} categories={cats} />

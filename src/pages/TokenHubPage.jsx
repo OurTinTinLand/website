@@ -21,7 +21,7 @@ export function TokenHubPage() {
     if (sel) sel.value = name;
   };
 
-  const submitIntent = () => {
+  const submitIntent = async () => {
     if (!session.logged) {
       toast.show('请先登录后再提交意向单');
       return;
@@ -30,12 +30,13 @@ export function TokenHubPage() {
     const volume   = document.getElementById('ti-volume').value;
     const contact  = (document.getElementById('ti-contact').value.trim()) || session.email;
     const scene    = document.getElementById('ti-scene').value;
-    addIntent({
+    await addIntent({
       id: 't-' + (2001 + Math.floor(Math.random() * 10000)),
       user_id: session.user_id,
       user_email: session.email,
       provider, expected_volume: volume, contact, scene,
       status: 'pending',
+      synced: true,
       created_at: '2026-08-12 10:35',
     });
     toast.show('意向单已提交 · 运营 1 个工作日内联系你');

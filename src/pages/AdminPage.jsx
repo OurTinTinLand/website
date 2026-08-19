@@ -11,7 +11,7 @@ import React, { useState, useMemo } from 'react';
 import { useStore, useToast } from '../state/store';
 import { money } from '../utils/format';
 import { dogUrl } from '../utils/constants';
-import { courses, events, hackathons, jobs } from '../data/index.js';
+// admin 内容列表从 store.catalog 取（PB 优先 → seed）
 import { COURSE_CATEGORIES, COURSE_SUBCATEGORIES } from '../data/index.js';
 
 const TABS = [
@@ -122,11 +122,12 @@ function kindLabel(k) {
   return ({ courses:'课程', events:'活动', hackathons:'黑客松', jobs:'招聘', apps:'应用工具', providers:'Token Hub 渠道' })[k] || k;
 }
 
-function initialList(kind) {
-  if (kind === 'courses')    return courses.map(slim);
-  if (kind === 'events')     return events.map(slim);
-  if (kind === 'hackathons') return hackathons.map(slim);
-  if (kind === 'jobs')       return jobs.map(slim);
+function initialList(kind, cat) {
+  cat = cat || {};
+  if (kind === 'courses')    return (cat.courses || []).map(slim);
+  if (kind === 'events')     return (cat.events || []).map(slim);
+  if (kind === 'hackathons') return (cat.hackathons || []).map(slim);
+  if (kind === 'jobs')       return (cat.jobs || []).map(slim);
   if (kind === 'apps')       return [{ id:'ap-1', title:'占位应用', state:'upcoming', review_required:false }];
   if (kind === 'providers')  return [{ id:'pv-1', title:'合作渠道 A', state:'upcoming', review_required:false }];
   return [];

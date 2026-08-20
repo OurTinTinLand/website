@@ -349,27 +349,35 @@ Authorization: <user token>
 
 ## 8. 与 React SPA 的对接
 
-`src/utils/pb-client.js` 是一个轻量浏览器端 SDK（无需打包），封装 fetch + 错误处理。
-完整方法列表见文件末尾 `export default {...}`。
+### 8.1 SDK 来源（v1.1 改造后）
+
+* 共享 SDK：`src/lib/pb-sdk.mjs`
+  基于官方 [`pocketbase/js-sdk@0.28`](https://github.com/pocketbase/js-sdk) 封装。
+  CLI 脚本（`scripts/*.mjs`）和浏览器前端都引用它，避免重复造 fetch wrapper / token 持久化。
+* 前端入口：`src/utils/pb-client.js` —— 一个 107 行的 re-export shim，
+  保持旧 `import * as PB from "../utils/pb-client.js"` 调用方式不变；
+  内部走 `createPbClient()` 懒初始化单例。
+* 后端 base URL：浏览器全部用相对路径 `/api/*`，由 `pb_public` 同源托管保证。
+
+### 8.2 用法（前端，保持旧 API）
 
 ```js
-import { aiRoute, listCoursesNormalized, requestEmailCode, verifyEmailCode,
-         createOrder, resendAdvisorCode, listJobPostingsNormalized,
-         listTalentProfilesNormalized, getUserProfileNormalized } from "../src/utils/pb-client.js";
+import * as PB from "../utils/pb-client.js";
+// 或：import { aiRoute, listCoursesNormalized, ... } from "../utils/pb-client.js";
 
 // 首页假 AI 路由
-const r = await aiRoute("想学 AI Agent");
+const r = await PB.aiRoute("想学 AI Agent");
 if (r.intent === "course") renderCards(r.cards);
 
 // 登录
-await requestEmailCode("user@example.com");
-await verifyEmailCode("user@example.com", "123456");
+await PB.requestEmailCode("user@example.com");
+await PB.verifyEmailCode("user@example.com", "123456");
 
 // 课程列表
-const items = await listCoursesNormalized({ state: "upcoming" });
+const items = await PB.listCoursesNormalized({ state: "upcoming" });
 
 // 报名（自动带 user token）
-await createSignup({
+await PB.createSignup({
     user_email: "alice@example.com",
     kind: "event",
     item_id: eventId,
@@ -377,11 +385,31 @@ await createSignup({
     payload: { name: "张三", phone: "13800138000" },
 });
 
+// 运营后台 CRUD（CLI：直连 superuser；浏览器：走 /api/admin/proxy + demo secret）
+await PB.createCourse({ title: "...", slug: "...", category: "AI 应用", ... });
+await PB.updateCourse(id, { price_amount: 1299 });
+await PB.deleteCourse(id);
+
 // 个人中心
-const me = await getUserProfileNormalized(myRecord.id);
+const me = await PB.getUserProfileNormalized(myRecord.id);
 ```
 
-后端 base URL 已简化：浏览器全部用相对路径 `/api/*`，由 `pb_public` 同源托管保证。
+### 8.3 CLI 验收脚本（spec §17 逐条跑）
+
+```bash
+cd backend
+./pocketbase serve --http=127.0.0.1:8090 --dir=pb_data \
+    --hooksDir=pb_hooks --migrationsDir=pb_migrations &
+
+cd ..
+node scripts/check-pb.mjs                    # 30 项：连通 + 集合清单
+PB_LOG=/tmp/pb.log node scripts/test-spec-conformance.mjs   # 35 项：§17 验收
+PB_LOG=/tmp/pb.log node scripts/simulate-auth.mjs all      #  9 项：§6 登录模拟
+node scripts/admin-crud.mjs                  # 22 项：§14 运营后台
+```
+
+任何 hook / schema 改动让某项挂了，对应 PR 应连带修脚本。
+详见 `scripts/README.md`。
 
 ---
 

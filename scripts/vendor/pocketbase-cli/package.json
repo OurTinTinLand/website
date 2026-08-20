@@ -1,0 +1,19 @@
+{
+  "name": "pocketbase-cli",
+  "version": "0.1.7",
+  "description": "Remote-only PocketBase CLI (vendored snapshot from Ericsunsk/Pocketbase-CLI @ 0.1.7)",
+  "license": "MIT",
+  "main": "dist/bin.js",
+  "bin": {
+    "pocketbase-cli": "./dist/bin.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "_upstream": {
+    "repo": "https://github.com/Ericsunsk/Pocketbase-CLI",
+    "version": "0.1.7",
+    "vendored_at": "2026-08-20",
+    "update_with": "bash scripts/install-pbcli.sh"
+  }
+}

@@ -2,11 +2,12 @@
 # ============================================================
 # 统一镜像启动脚本 · 前端 + PocketBase 共容器
 # ------------------------------------------------------------
-# 1) Bootstrap 超管账号（PB_ADMIN_EMAIL / PB_ADMIN_PASSWORD 环境变量）
+# 1) 解析数据目录（priority: RAILWAY_VOLUME_MOUNT_PATH > PB_DATA > /pb_data）
+# 2) Bootstrap 超管账号（PB_ADMIN_EMAIL / PB_ADMIN_PASSWORD 环境变量）
 #    用 `pocketbase superuser upsert` 直接落库，不依赖 web UI
-# 2) 启动 PocketBase（内部端口 PB_PORT，不暴露公网）
-# 3) 等 PB /api/health 通
-# 4) exec Node（监听外部 PORT，对 /api/* 与 /_/* 反向代理到 PB）
+# 3) 启动 PocketBase（内部端口 PB_PORT，不暴露公网）
+# 4) 等 PB /api/health 通
+# 5) exec Node（监听外部 PORT，对 /api/* 与 /_/* 反向代理到 PB）
 # ============================================================
 set -e
 
@@ -26,14 +27,24 @@ PB_ORIGINS="${PB_ORIGINS:-*}"
 PB_ADMIN_EMAIL="${PB_ADMIN_EMAIL:-admin@tintin.land}"
 PB_ADMIN_PASSWORD="${PB_ADMIN_PASSWORD:-tintinland2026}"
 
+# 数据目录解析：
+#   - 显式设 RAILWAY_VOLUME_MOUNT_PATH（Railway 注入的 volume 挂载点）：
+#     用它作为 PB 的 --dir（数据写到这里 = 持久化生效）
+#   - 否则用 PB_DATA
+#   - 否则回落到 /pb_data
+# Railway Volume 必须在 railway.toml 的 [[deploy.volumes]] 配 mountPath 与 PB_DATA
+# 一致（或设 RAILWAY_VOLUME_MOUNT_PATH），否则容器重启会丢数据。
+PB_DATA_DIR="${RAILWAY_VOLUME_MOUNT_PATH:-${PB_DATA:-/pb_data}}"
+mkdir -p "${PB_DATA_DIR}"
+
 # 1) Bootstrap 超管账号 —— 用 upsert 保证幂等：
 #    - 已存在（从旧 volume 恢复）：更新密码
 #    - 不存在（首次启动 / 新 volume）：创建
 # 这一步必须在 serve 之前；serve 启动后数据库上锁就 upsert 不进去了。
 # 注意：--hooksDir 也要带上，否则 hooks 会报 LOADED 失败（v0.27+ 强校验）
-echo "[start.sh] bootstrapping superuser ${PB_ADMIN_EMAIL} (dir=/pb_data)"
+echo "[start.sh] bootstrapping superuser ${PB_ADMIN_EMAIL} (dir=${PB_DATA_DIR})"
 /pb/pocketbase superuser upsert "${PB_ADMIN_EMAIL}" "${PB_ADMIN_PASSWORD}" \
-  --dir=/pb_data \
+  --dir="${PB_DATA_DIR}" \
   --hooksDir=/pb/hooks \
   --migrationsDir=/pb/migrations
 
@@ -41,7 +52,7 @@ echo "[start.sh] bootstrapping superuser ${PB_ADMIN_EMAIL} (dir=/pb_data)"
 echo "[start.sh] starting PocketBase on :${PB_PORT} (origins=${PB_ORIGINS})"
 /pb/pocketbase serve \
   --http=0.0.0.0:${PB_PORT} \
-  --dir=/pb_data \
+  --dir="${PB_DATA_DIR}" \
   --hooksDir=/pb/hooks \
   --migrationsDir=/pb/migrations \
   --hooksWatch=false \

@@ -95,8 +95,14 @@ RUN chmod +x /start.sh
 
 # 数据持久化：Railway 不支持 Dockerfile 里的 VOLUME 指令。
 # 部署时在 Railway Dashboard → Service → Settings → Volumes 挂一个 Volume
-# 到容器内的 /pb_data（或任何你想用的路径），通过环境变量 PB_DATA 注入。
+# 到容器内的 /pb_data（或任何你想用的路径）。start.sh 会自动读取
+# RAILWAY_VOLUME_MOUNT_PATH 或 PB_DATA 环境变量，把 PB 的 --dir 指向挂载点。
 # 本地 docker run 时手动 -v $PWD/backend/pb_data:/pb_data 挂载。
+
+# 数据目录：start.sh 解析顺序为 RAILWAY_VOLUME_MOUNT_PATH > PB_DATA > /pb_data
+# 默认 /pb_data；Railway 部署时把 railway.toml 的 mountPath 与此保持一致
+# （或设 RAILWAY_VOLUME_MOUNT_PATH 环境变量），否则容器重启会丢数据
+ENV PB_DATA=/pb_data
 
 # 端口：外部 PORT（Railway 注入，默认 3000）+ 内部 PB_PORT（不暴露）
 ENV PORT=3000

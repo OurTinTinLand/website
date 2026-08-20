@@ -10,6 +10,10 @@
 #   - Railway 不支持 Dockerfile 里的 VOLUME 指令
 #   - 改成这里 [[deploy.volumes]] 声明
 #   - /pb_data 在容器内挂到名为 "pb-data" 的 Railway Volume（持久化 PocketBase）
+#   - mountPath 必须与 start.sh 里读取的目录一致：start.sh 解析顺序为
+#     RAILWAY_VOLUME_MOUNT_PATH > PB_DATA > /pb_data，所以这里改 mountPath 时
+#     也要改 PB_DATA（或让 RAILWAY_VOLUME_MOUNT_PATH 注入 = mountPath）
+#   - 想用其它路径（如 /data）？把下面 mountPath 改成 "/data"，start.sh 会自动跟随
 #
 # 切到分离部署：把 dockerfilePath 改成 "Dockerfile.frontend"，
 #   然后另起一个 service 用 Dockerfile.backend + railway.backend.toml

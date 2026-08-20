@@ -54,6 +54,23 @@ curl http://127.0.0.1:8090/api/health
 > `server.js` 同时把这两个值注入到 `index.html` 的 `window.PB_ADMIN_EMAIL/PASSWORD`，
 > 前端 `src/utils/pb-client.js` 会优先读运行时注入，避免硬编码密码过期导致 401。
 
+### 1.1 数据目录与持久化 Volume
+
+PB 的数据目录（`--dir`）解析顺序，**优先级从高到低**：
+
+1. `RAILWAY_VOLUME_MOUNT_PATH` —— Railway 注入的 Volume 挂载点（Railway 单 Volume）
+2. `PB_DATA` —— 自定义环境变量
+3. `/pb_data` —— 默认值
+
+`start.sh` 启动时会 `mkdir -p` 这个目录。如果想用别的路径（如 `/data`），
+
+- Railway 部署：改 `railway.toml` 的 `mountPath = "/data"`，Railway 会自动
+  注入 `RAILWAY_VOLUME_MOUNT_PATH=/data`，start.sh 自动跟随。`PB_DATA` 不用动。
+- 独立 Docker：`docker run -e PB_DATA=/data -v $PWD/data:/data ...`
+
+**坑**：如果 `mountPath` 改了但没改 `--dir`，PB 会写到容器内临时路径，
+重启数据全丢。改 mountPath 之前确认 `start.sh` 的解析顺序能跟随到。
+
 ## 2. 数据迁移
 
 PocketBase v0.23+ 用 JS 写迁移。所有迁移在启动时自动按文件名升序 apply 到

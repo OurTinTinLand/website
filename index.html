@@ -20,6 +20,31 @@
   <!-- React UMD（运行时由 window.React / window.ReactDOM 提供） -->
   <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
   <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+
+  <!--
+    Privy SDK 浏览器侧动态加载（spec §6.4）
+    ----------------------------------------------------------------------
+    PrivyProviderRoot 里用 Function('s','return import(s)')() 的方式动态 import，
+    这样 esbuild 不在 build time 强制解析（避免沙盒/无 SDK 部署时构建失败）。
+
+    浏览器裸 specifier（如 '@privy-io/react-auth'）需要 importmap 解析到完整 URL；
+    我们把这条映射指到 esm.sh — 它会自动 assemble 整个 dep 子树
+    （@privy-io/api-base / popup / wagmi / viem / @solana/kit 等）一并吐回。
+
+    版本固定 ^3.35.0 与 package.json optionalDependencies 对齐；>= Chrome 89 / Safari 16.4 / Firefox 108 都支持 importmap。
+    不支持 importmap 的老浏览器 → dynamic import 报错 → 走 catch → PrivyStandaloneLogin fallback。
+  -->
+  <script type="importmap">
+  {
+    "imports": {
+      "@privy-io/react-auth": "https://esm.sh/@privy-io/react-auth@^3.35.0",
+      "react": "https://esm.sh/react@18.3.1",
+      "react-dom": "https://esm.sh/react-dom@18.3.1",
+      "react-dom/client": "https://esm.sh/react-dom@18.3.1/client",
+      "react/jsx-runtime": "https://esm.sh/react@18.3.1/jsx-runtime"
+    }
+  }
+  </script>
 </head>
 <body>
   <div id="root"></div>

@@ -14,6 +14,7 @@ pnpm-debug.log*
 # 环境 / 临时
 .env
 .env.*
+!.env.example
 .DS_Store
 .idea/
 .vscode/

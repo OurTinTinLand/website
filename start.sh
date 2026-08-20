@@ -11,13 +11,21 @@ set -e
 PB_PORT="${PB_PORT:-8090}"
 PORT="${PORT:-3000}"
 
-echo "[start.sh] starting PocketBase on :${PB_PORT}"
+# CORS 来源列表：逗号分隔。
+#   - 未设 PB_ORIGINS 时：默认 * 允许所有（开发/Stageing 方便）
+#   - Railway 生产推荐显式写：PB_ORIGINS="https://tintin.land,https://www.tintin.land"
+# 注意：PocketBase 的 --origins 只对浏览器 fetch 的 CORS 生效，
+# 不会影响 /api/* 由 server.js 反代（同源代理不算跨域）。
+PB_ORIGINS="${PB_ORIGINS:-*}"
+
+echo "[start.sh] starting PocketBase on :${PB_PORT} (origins=${PB_ORIGINS})"
 /pb/pocketbase serve \
   --http=0.0.0.0:${PB_PORT} \
   --dir=/pb_data \
   --hooksDir=/pb/hooks \
   --migrationsDir=/pb/migrations \
-  --hooksWatch=false &
+  --hooksWatch=false \
+  --origins="${PB_ORIGINS}" &
 PB_PID=$!
 
 echo "[start.sh] waiting for PocketBase /api/health (max 30s)..."

@@ -165,7 +165,8 @@ await createOrder({
 - [ ] 设置 `encryptionEnv`：`./pocketbase serve --encryptionEnv=...`
 - [ ] 配 SMTP：`--smtpHost=... --smtpPort=... --smtpUsername=... --smtpPassword=...`
 - [ ] 删 `auth.pb.js` 中 `dev_code` 回显（生产不允许泄露）
-- [ ] 启 CORS 白名单：`--origins=https://tintin.land`
+- [ ] 启 CORS 白名单：`PB_ORIGINS=https://tintin.land,https://www.tintin.land ./start.sh`
+      （未设置时默认 `*`；Dockerfile 统一镜像自动读取 env）
 - [ ] 把 `pb_public/` 改成 SPA 编译产物，让 PocketBase 同时托管静态站点
 - [ ] 接入微信 OAuth / 钱包签名校验（替换占位）
 - [ ] 给 `users` / `user_profiles` 的 listRule/viewRule 在生产环境加 superuser 兜底

@@ -75,17 +75,29 @@ routerAdd("POST", "/api/admin/superuser-token", function(e) {
         if (!eq) {
             throw new ForbiddenError("凭据无效");
         }
-        var adminEmail    = ($os.getenv("PB_ADMIN_EMAIL")    || "").trim();
-        var adminPassword = ($os.getenv("PB_ADMIN_PASSWORD") || "").trim();
+        // 默认值对齐 start.sh:${PB_ADMIN_EMAIL:-admin@tintin.land} 的设置；
+        // 这避免 Railway Variables 没显式写但又用了 start.sh 默认 bootstrap
+        // 出超管的场景下，运行时 auth 仍能拿回 token。
+        // 注意：默认值是公开的（见 .env.example），上生产前应在 Railway Variables
+        // 设 PB_ADMIN_EMAIL + PB_ADMIN_PASSWORD 覆盖。
+        var adminEmail    = ($os.getenv("PB_ADMIN_EMAIL")    || "admin@tintin.land").trim();
+        var adminPassword = ($os.getenv("PB_ADMIN_PASSWORD") || "tintinland2026").trim();
         if (!adminEmail || !adminPassword) {
-            throw new InternalServerError("管理员账号未配置");
+            throw new InternalServerError("管理员账号未配置（需 PB_ADMIN_EMAIL + PB_ADMIN_PASSWORD）");
+        }
+        // fallback 命中默认值 → 在 log 里高亮，运维一眼能看到
+        if (!$os.getenv("PB_ADMIN_EMAIL") || !$os.getenv("PB_ADMIN_PASSWORD")) {
+            console.log("[admin/superuser-token] WARN: using fallback defaults — set PB_ADMIN_EMAIL + PB_ADMIN_PASSWORD in Railway Variables for prod");
         }
         // $http.send 需要绝对 URL；从 PB 的监听地址推断（生产可设 PB_ADMIN_AUTH_URL 覆盖）
+        // 优先用 PB_ADMIN_AUTH_URL（生产 / 反代场景下显式配置）；
+        // 否则把 Railway 注入的 PORT 拿来当本地端口；再否则用 PB_PORT/8090。
+        // 这一行跟 start.sh 里 `pocketbase serve --http=0.0.0.0:${PORT}` 是同一份语义，
+        // 必须保持一致，否则 goja 内发的回环 HTTP 走不到 PB 自己。
         var authUrl = $os.getenv("PB_ADMIN_AUTH_URL") || "";
         if (!authUrl) {
-            var pbHost = $os.getenv("PB_HOST") || "127.0.0.1";
-            var pbPort = $os.getenv("PB_PORT") || "8090";
-            authUrl = "http://" + pbHost + ":" + pbPort;
+            var pbPort = $os.getenv("PORT") || $os.getenv("PB_PORT") || "8090";
+            authUrl = "http://127.0.0.1:" + pbPort;
         }
         var resp = null;
         try {

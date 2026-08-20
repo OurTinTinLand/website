@@ -7,12 +7,14 @@
 //   14.6 用户与权限管理（V1.1 暂用 is_admin）
 //   14.7 系统通知文案配置（占位）
 //   本周目标：模块一（内容管理）+ 模块四（订单核销）必须完整；其余做基础版
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useStore, useToast } from '../state/store';
 import { money } from '../utils/format';
 import { dogUrl } from '../utils/constants';
 // admin 内容列表从 store.catalog 取（PB 优先 → seed）
 import { COURSE_CATEGORIES, COURSE_SUBCATEGORIES } from '../data/index.js';
+// V1.1：admin CRUD（创建/更新/上下架/删除都写 PB）
+import * as PB from '../utils/pb-client.js';
 
 const TABS = [
   ['content',   '① 内容管理'],
@@ -70,21 +72,100 @@ function Gate({ onDemo }) {
 }
 
 // ========== ① 内容管理中心 §14.2 ==========
+// V1.1 真实接入：列表从 store.catalog 取（PB → seed fallback）；
+//             保存走 PB CRUD（adminCreate/adminUpdate/adminDelete），前端乐观更新。
+//             后端不通时降级为纯本地（toast 提示，不阻塞 UI）。
 function ContentCenter() {
+  const { catalog, reloadCatalog, pb } = useStore();
+  const toast = useToast();
   const [kind, setKind] = useState('courses');
-  const [list, setList] = useState(() => initialList('courses'));
+  const [list, setList] = useState(() => initialList('courses', catalog));
   const [editing, setEditing] = useState(null);
+
+  // 每次 catalog 重新加载（来自 PB）后，同步回填当前 kind 的本地列表
+  useEffect(() => {
+    setList(initialList(kind, catalog));
+    setEditing(null);
+  }, [catalog, kind]);
 
   const switchKind = (k) => {
     setKind(k);
-    setList(initialList(k));
+    setList(initialList(k, catalog));
     setEditing(null);
+  };
+
+  // —— 乐观更新：本地立刻改，再异步 PB —— //
+  const persistUpsert = async (saved) => {
+    setList((prev) => {
+      const exists = prev.find((x) => x.id === saved.id);
+      if (exists) return prev.map((x) => x.id === saved.id ? saved : x);
+      return [saved, ...prev];
+    });
+    setEditing(null); // 不管 PB 成不成功，先关弹窗（运营能看到本地生效）
+    try {
+      const api = adminApiFor(kind);
+      const payload = toPbPayload(kind, saved);
+      let realId = saved.id;
+      if (saved.__new || !looksLikePbId(saved.id)) {
+        const r = await api.create(payload);
+        realId = r.id || saved.id;
+      } else {
+        await api.update(saved.id, payload);
+      }
+      // 用 PB 返回的真实 id 替换本地占位
+      setList((prev) => prev.map((x) => x.id === saved.id ? { ...x, id: realId, _synced: true } : x));
+      toast.show(`已保存到 PocketBase · ${kindLabel(kind)}「${saved.title || '（无标题）'}」`);
+      // 触发 catalog reload（让 ListPage 等其他模块也看到最新数据）
+      reloadCatalog();
+    } catch (err) {
+      console.warn('[admin.content.save] PB failed:', err.message);
+      toast.show('PB 写入失败：' + (err.message || 'unknown') + ' · 当前仅本地可见');
+    }
+  };
+
+  const persistToggleState = async (id) => {
+    let next = null;
+    setList((prev) => prev.map((x) => {
+      if (x.id !== id) return x;
+      next = { ...x, state: x.state === 'off' ? 'upcoming' : 'off' };
+      return next;
+    }));
+    if (!next) return;
+    try {
+      const api = adminApiFor(kind);
+      await api.update(id, { state: next.state });
+      toast.show(`${next.state === 'off' ? '已下架' : '已上架'} · ${kindLabel(kind)}`);
+      reloadCatalog();
+    } catch (err) {
+      toast.show('PB 状态切换失败：' + (err.message || 'unknown'));
+    }
+  };
+
+  const persistRemove = async (id) => {
+    if (!confirm('确认删除？此操作会从 PocketBase 中删除该记录（不可恢复）')) return;
+    const backup = list.find((x) => x.id === id);
+    setList((prev) => prev.filter((x) => x.id !== id));
+    try {
+      const api = adminApiFor(kind);
+      await api.remove(id);
+      toast.show('已从数据库删除');
+      reloadCatalog();
+    } catch (err) {
+      // 回滚
+      if (backup) setList((prev) => [backup, ...prev]);
+      toast.show('PB 删除失败：' + (err.message || 'unknown'));
+    }
   };
 
   return (
     <>
       <div className="spec" style={{ marginBottom:18 }}>
         课程 / 活动 / 黑客松 / 招聘 / 应用工具 / Token Hub 渠道 · 统一「列表 → 新建 → 编辑 → 上下架 → 删除」标准链路。
+        {catalog?._source === 'fallback' && (
+          <span style={{ marginLeft:10, color:'var(--danger, #c33)' }}>
+            ⚠ PB 未连接 · 当前为种子数据，操作仅本地生效
+          </span>
+        )}
       </div>
 
       <div className="pills" style={{ marginBottom:18 }}>
@@ -93,29 +174,82 @@ function ContentCenter() {
         ))}
       </div>
 
-      <button className="btn btn-fill btn-sm" style={{ marginBottom:14 }} onClick={() => setEditing({ id:'', __new:true, kind, review_required:false, fields_config:{}, tags:[], state:'upcoming' })}>
+      <button className="btn btn-fill btn-sm" style={{ marginBottom:14 }} onClick={() => setEditing({ id:'', __new:true, kind, review_required:false, fields_config:{}, tags:[], state:'upcoming', content_source:'native' })}>
         + 新建{kindLabel(kind)}
       </button>
 
-      <ContentList kind={kind} list={list} onEdit={setEditing} onChange={setList} />
+      <ContentList kind={kind} list={list} onEdit={setEditing} onToggleState={persistToggleState} onRemove={persistRemove} />
 
       {editing && (
         <ContentEditModal
           def={editing}
           kind={kind}
           onClose={() => setEditing(null)}
-          onSave={(saved) => {
-            setList((prev) => {
-              const exists = prev.find((x) => x.id === saved.id);
-              if (exists) return prev.map((x) => x.id === saved.id ? saved : x);
-              return [saved, ...prev];
-            });
-            setEditing(null);
-          }}
+          onSave={persistUpsert}
         />
       )}
     </>
   );
+}
+
+// 路由：admin API 选择 + frontend draft → PB payload 映射
+function adminApiFor(kind) {
+  // 返回 { create, update, remove }
+  switch (kind) {
+    case 'courses':    return { create: PB.createCourse,    update: PB.updateCourse,    remove: PB.deleteCourse };
+    case 'events':     return { create: PB.createEvent,     update: PB.updateEvent,     remove: PB.deleteEvent };
+    case 'hackathons': return { create: PB.createHackathon, update: PB.updateHackathon, remove: PB.deleteHackathon };
+    case 'jobs':       return { create: PB.createJob,       update: PB.updateJob,       remove: PB.deleteJob };
+    case 'apps':       return { create: PB.createApp,       update: PB.updateApp,       remove: PB.deleteApp };
+    case 'providers':  return { create: PB.createProvider,  update: PB.updateProvider,  remove: PB.deleteProvider };
+    default:           return { create: async () => { throw new Error('unsupported kind: ' + kind); },
+                                update: async () => { throw new Error('unsupported kind: ' + kind); },
+                                remove: async () => { throw new Error('unsupported kind: ' + kind); } };
+  }
+}
+
+// 把前端的 draft 转成 PB 需要的字段；schema 不存在的字段会被丢弃
+function toPbPayload(kind, draft) {
+  const base = {
+    title: draft.title || '（无标题）',
+    state: draft.state || 'upcoming',
+    content_source: draft.content_source || 'native',
+    signup_review_required: !!draft.review_required,
+    signup_fields_config: draft.fields_config || {},
+  };
+  if (kind === 'courses') {
+    return {
+      ...base,
+      category: draft.category || '',
+      subcategory: draft.subcategory || '',
+      tags: Array.isArray(draft.tags) ? draft.tags : [],
+      // 必填兜底：PB schema 要求 category difficulty form price_type
+      difficulty: draft.difficulty || '入门',
+      form: draft.form || '直播',
+      price_type: draft.price_type || 'free',
+    };
+  }
+  if (kind === 'events') {
+    return { ...base, tag: draft.category || '' };
+  }
+  if (kind === 'hackathons') {
+    return { ...base, theme: draft.category || '' };
+  }
+  if (kind === 'jobs') {
+    return { ...base, role: draft.category || '', company: draft.company || '' };
+  }
+  if (kind === 'apps') {
+    return { ...base, name: draft.title || '', ic: draft.ic || '' };
+  }
+  if (kind === 'providers') {
+    return { ...base, name: draft.title || '' };
+  }
+  return base;
+}
+
+// PB record id 形如 'abc123def45678'（15 位 hex）；本地占位用 'new-<ts>' 或 'ap-1' / 'pv-1'
+function looksLikePbId(id) {
+  return typeof id === 'string' && /^[a-z0-9]{15}$/i.test(id);
 }
 
 function kindLabel(k) {
@@ -124,18 +258,24 @@ function kindLabel(k) {
 
 function initialList(kind, cat) {
   cat = cat || {};
-  if (kind === 'courses')    return (cat.courses || []).map(slim);
-  if (kind === 'events')     return (cat.events || []).map(slim);
-  if (kind === 'hackathons') return (cat.hackathons || []).map(slim);
-  if (kind === 'jobs')       return (cat.jobs || []).map(slim);
-  if (kind === 'apps')       return [{ id:'ap-1', title:'占位应用', state:'upcoming', review_required:false }];
-  if (kind === 'providers')  return [{ id:'pv-1', title:'合作渠道 A', state:'upcoming', review_required:false }];
+  const arr =
+      kind === 'courses'    ? cat.courses
+    : kind === 'events'     ? cat.events
+    : kind === 'hackathons' ? cat.hackathons
+    : kind === 'jobs'       ? cat.jobs
+    : kind === 'apps'       ? cat.apps
+    : kind === 'providers'  ? cat.providers
+    : [];
+  if (Array.isArray(arr) && arr.length) return arr.map(slim);
+  // 降级占位（仅在 PB 完全无数据时展示，让运营至少能看到空白页结构）
+  if (kind === 'apps')       return [{ id:'ap-1', title:'占位应用', state:'upcoming', review_required:false, content_source:'native', fields_config:{}, tags:[] }];
+  if (kind === 'providers')  return [{ id:'pv-1', title:'合作渠道 A', state:'upcoming', review_required:false, content_source:'native', fields_config:{}, tags:[] }];
   return [];
 }
 
 function slim(x) {
   return {
-    id: x.id, title: x.title,
+    id: x.id, title: x.title || x.name || '',
     category: x.category || x.tag || x.role || x.theme || '',
     subcategory: x.subcategory || '',
     tags: x.tags || [],
@@ -146,14 +286,11 @@ function slim(x) {
   };
 }
 
-function ContentList({ kind, list, onEdit, onChange }) {
-  const toggleState = (id) => {
-    onChange((prev) => prev.map((x) => x.id === id ? { ...x, state: x.state === 'off' ? 'upcoming' : 'off' } : x));
-  };
-  const remove = (id) => {
-    if (!confirm('确认删除？此操作不可恢复（演示）')) return;
-    onChange((prev) => prev.filter((x) => x.id !== id));
-  };
+function ContentList({ kind, list, onEdit, onToggleState, onRemove }) {
+  // toggleState / remove 都由父组件 persistToggleState / persistRemove 实现，
+  // 这里只做 UI 触发，PB 调用与乐观更新都在父层
+  const toggleState = (id) => onToggleState(id);
+  const remove = (id) => onRemove(id);
 
   if (!list.length) return <div className="empty">该分类暂无内容</div>;
 
@@ -238,8 +375,8 @@ function ContentEditModal({ def, kind, onClose, onSave }) {
             </>
           )}
 
-          <div className="fr"><label>自定义标签 · 逗号分隔</label>
-            <input value={(draft.tags || []).join(',')} onChange={(e) => set('tags', e.target.value.split(',').map((s) => s.trim()).filter(Boolean))} placeholder="Solidity,EVM,审计" />
+          <div className="fr"><label>自定义标签 · 中英文逗号分隔</label>
+            <input value={(draft.tags || []).join('，')} onChange={(e) => set('tags', e.target.value.split(/[,，]/).map((s) => s.trim()).filter(Boolean))} placeholder="Solidity，EVM，审计" />
           </div>
 
           <div className="fr"><label>内容来源</label>

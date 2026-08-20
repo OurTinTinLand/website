@@ -36,7 +36,7 @@ export function StoreProvider({ children }) {
   const [thTabReq,    setThTabReq]    = useState(null);
 
   // Catalog 懒加载（PB 优先，失败降级到 seed）
-  const [catalog] = useCatalog();
+  const [catalog, reloadCatalog] = useCatalog();
 
   // PB 启动时尝试恢复 session
   useEffect(() => {
@@ -251,6 +251,7 @@ export function StoreProvider({ children }) {
     addIntent, contactIntent, closeIntent, addSignup,
     reviewSubmission, addReviewItem,
     setThTabReq, resetAll,
+    reloadCatalog,
     // PB 原始 client（运营后台调用 listJobPostings 等高级操作）
     pb: PB,
   }), [session, orders, intents, mySignups, orderSeq, reviewQueue, thTabReq, catalog,

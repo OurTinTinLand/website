@@ -267,6 +267,42 @@ export async function reviewSubmission(id, reviewStatus, notes) {
 export const createLead = (payload) =>
     req("POST", "/api/collections/leads/records", payload);
 
+// ---- 4b. 运营后台：目录 CRUD（courses / events / hackathons / jobs / apps / providers） ----
+// 写操作需要 superuser token（运营后台；前端 demoAdmin 登录后调用）
+function withSuper(headers) { return headers; }
+
+async function adminCreate(name, payload) {
+    const t = await getSuperuserToken();
+    return req("POST", "/api/collections/" + name + "/records", payload, t);
+}
+async function adminUpdate(name, id, payload) {
+    const t = await getSuperuserToken();
+    return req("PATCH", "/api/collections/" + name + "/records/" + encodeURIComponent(id), payload, t);
+}
+async function adminDelete(name, id) {
+    const t = await getSuperuserToken();
+    return req("DELETE", "/api/collections/" + name + "/records/" + encodeURIComponent(id), undefined, t);
+}
+
+export const createCourse     = (p) => adminCreate("courses",     p);
+export const updateCourse     = (id, p) => adminUpdate("courses", id, p);
+export const deleteCourse     = (id) => adminDelete("courses", id);
+export const createEvent      = (p) => adminCreate("events",      p);
+export const updateEvent      = (id, p) => adminUpdate("events", id, p);
+export const deleteEvent      = (id) => adminDelete("events", id);
+export const createHackathon   = (p) => adminCreate("hackathons",  p);
+export const updateHackathon  = (id, p) => adminUpdate("hackathons", id, p);
+export const deleteHackathon  = (id) => adminDelete("hackathons", id);
+export const createJob        = (p) => adminCreate("jobs",        p);
+export const updateJob        = (id, p) => adminUpdate("jobs", id, p);
+export const deleteJob        = (id) => adminDelete("jobs", id);
+export const createApp        = (p) => adminCreate("apps",        p);
+export const updateApp        = (id, p) => adminUpdate("apps", id, p);
+export const deleteApp        = (id) => adminDelete("apps", id);
+export const createProvider   = (p) => adminCreate("providers",   p);
+export const updateProvider   = (id, p) => adminUpdate("providers", id, p);
+export const deleteProvider   = (id) => adminDelete("providers", id);
+
 // ---- 5. 登录后读自己的数据 ----
 export const myOrders  = (qs) => listCollection("orders", qs);
 export const myIntents = (qs) => listCollection("intents", qs);

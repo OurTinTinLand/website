@@ -13,6 +13,12 @@ import { TokenHubPage } from './pages/TokenHubPage';
 import { EnterprisePage } from './pages/EnterprisePage';
 import { AboutPage } from './pages/AboutPage';
 import { MemberPage } from './pages/MemberPage';
+
+// Privy 登录集成（spec §6.4）
+// 在打包好的 bundle.js 里，esbuild 会把 '@privy-io/react-auth' 当成 ESM external 处理；
+// 如果 node_modules 里没有该包，import 会在运行时失败 → 自动降级到 fallback 路径。
+// 我们用动态 import + Lazy boundary 让"缺包"只影响 Privy 这一支，不影响其它组件。
+import { PrivyProviderRoot } from './components/Auth/PrivyProviderRoot.jsx';
 import { AdminPage } from './pages/AdminPage';
 import { NotFoundPage } from './pages/NotFoundPage';
 import { AuthLoginPage, AuthCallbackPage } from './pages/AuthPages';
@@ -121,13 +127,17 @@ function Shell() {
 
 function App() {
   return (
-    <StoreProvider>
-      <ToastProvider>
-        <Router>
-          <Shell />
-        </Router>
-      </ToastProvider>
-    </StoreProvider>
+    // PrivyProviderRoot 必须放在最外层（因为 LoginModal 内部会用到 PrivyProvider 的子树）。
+    // 它自己有 SDK / fallback 自动适配逻辑：没装 @privy-io/react-auth 包时不报错。
+    <PrivyProviderRoot>
+      <StoreProvider>
+        <ToastProvider>
+          <Router>
+            <Shell />
+          </Router>
+        </ToastProvider>
+      </StoreProvider>
+    </PrivyProviderRoot>
   );
 }
 

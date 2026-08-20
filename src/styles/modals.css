@@ -36,3 +36,34 @@
 /* spec §8.3 顾问码展示框 */
 .advisor-box{display:flex;flex-direction:column;align-items:center;gap:6px;padding:18px 16px;border:1px dashed var(--line);border-radius:14px;background:var(--paper-2);margin-bottom:14px;}
 .advisor-qr{width:140px;height:140px;background:#fff;border:1px solid var(--line-2);border-radius:10px;padding:6px;object-fit:contain;}
+
+/* ============ Privy 登录面板（spec §6.4） ============ */
+.privy-stand,.privy-sdk-entry,.privy-loading{
+  display:flex;
+  flex-direction:column;
+  gap:6px;
+}
+.privy-stand code,.privy-sdk-entry code{
+  font-family:var(--f-mono);
+  font-size:11px;
+  background:var(--paper-2);
+  padding:1px 5px;
+  border-radius:4px;
+}
+.privy-stand .lm,.privy-sdk-entry .lm{
+  /* the .lm above already handles per-button layout; this is only for the
+     small icon container + label row to align nicely */
+  align-items:center;
+}
+.privy-sdk-entry .xs,.privy-stand .xs,.privy-loading .xs{
+  /* matches .xs typography from tokens; allow <a>/<code>/<b> inside */
+  font-size:12.5px;
+  color:var(--ink-3);
+  line-height:1.55;
+}
+.privy-sdk-entry .xs b,.privy-stand .xs b,.privy-loading .xs b{
+  color:var(--ink);
+}
+.privy-loading{
+  align-items:stretch;
+}

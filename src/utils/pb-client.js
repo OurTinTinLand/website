@@ -64,6 +64,8 @@ export const {
     requestEmailCode, verifyEmailCode,
     getWechatAuthUrl, wechatCallbackStub,
     getWalletNonce, verifyWallet,
+    // privy bridge (spec §6.4)
+    requestPrivyBridge,
     // admin
     getSuperuserToken, getDemoAdminToken, clearAdminToken, withAdminToken,
     // ai

@@ -173,11 +173,76 @@ POST /api/auth/wallet/verify
 
 ⚠️ 本周签名验证为占位（nonce 一致即通过）；真实签名校验（viem/ethers）放 V1.1。
 
-### 3.4 客户端 SDK 用法
+### 3.4 Privy 桥接（**v1.2，新增** · spec §6.4）
+
+> 把"Privy 已验证的身份"映射到 PB `users` 集合。前端透过 `@privy-io/react-auth` 的
+> `getAccessToken()` 拿到 JWT、加上从 `usePrivy()` 提的 email + linkedAccount 主体，
+> 一起发给本端；后端找/建用户，发 PB auth JWT。
+
+```http
+POST /api/auth/privy-bridge
+{
+  "email":         "user@example.com",   // 必需；首登时会基于此自动建 PB user
+  "method":        "google|x|github|discord|wallet|email|...",  // 推断的登录方式
+  "subject":       "did:privy:abc...",   // 可选；Privy 端 user.id 或 wallet address
+  "access_token":  "<Privy access JWT>", // 可选；生产严格模式必填
+}
+→ 200 OK
+{
+  "ok": true,
+  "token":    "<PB auth JWT>",         // 直接写 pb.authStore
+  "record":   { id, email, username, verified },
+  "login_method": "google",              // 映射到 user_profiles.login_method
+  "subject":  "did:privy:abc...",
+  "strict":   true | false,             // true 表示后端做了 JWT 验签
+  "access_token_len": 168               // dev 模式 hint
+}
+```
+
+**安全模型**（v1.1 当前 / "trust 模式"）：
+- 与现有 `email-code/verify` / `wallet/verify` 同等级 —— 前端声明 identity，后端签 PB token
+- 速率限制：同 IP 每分钟 5 次（与 email-OTP 一致）
+- `login_method` 白名单：google / x / twitter / github / discord / apple / wallet / email / sms / passkey / farcaster / telegram / privy；不识别则 fallback 为 `privy`
+- `user_profiles.login_method` 字段按本次落库的 method **累加**（逗号分隔），方便后台看出用户用过哪些方式
+
+**严格模式**（v1.2 路线）：
+- 设置环境变量 `PRIVY_APP_SECRET` 后，本端可用 Node 子进程 / WASM 做 ES256 验签
+- 客户端需透传真实 Privy `access_token`；前端目前拿的是 `usePrivy().getAccessToken()`
+- 验签通过 → 取 `token.claims.email` / `.sub` → 同上路径
+
+**前端调用**：
+
+```js
+import { requestPrivyBridge } from "../src/utils/pb-client.js";
+
+// SDK 路径：usePrivy().getAccessToken() 取到 JWT 后调用
+const data = await requestPrivyBridge({
+  email:        user.email.addresses[0].address,
+  method:       "google",          // 从 user.linkedAccounts 推断
+  subject:      user.id,
+  access_token: jwt,
+});
+// → pb.authStore 自动写入（详见 src/lib/pb-sdk.mjs）
+
+// 兜底路径（无 SDK）：demo OAuth 用 fake-code + 占位邮箱调用
+await requestPrivyBridge({
+  email:        "google-a1b2c3d4@privy.local",
+  method:       "google",
+  subject:      "a1b2c3d4",
+  access_token: "demo-google-a1b2c3d4",
+});
+```
+
+⚠️ `login_method` 永远写白名单已知值；签名验证交给后续 V1.2 严格模式。详见
+`backend/pb_hooks/auth.pb.js` 内的 inline 注释。
+
+### 3.5 客户端 SDK 用法
 
 ```js
 import { requestEmailCode, verifyEmailCode,
-         getWalletNonce, verifyWallet, logout } from "../src/utils/pb-client.js";
+         getWalletNonce, verifyWallet,
+         requestPrivyBridge,
+         logout } from "../src/utils/pb-client.js";
 
 // 邮箱
 await requestEmailCode("user@example.com");
@@ -189,6 +254,14 @@ const { nonce, message } = await getWalletNonce();
 // 让 MetaMask 签 message
 const sig = await signer.signMessage(message);
 await verifyWallet(address, sig, nonce);
+
+// Privy（v1.2）：把 Privy 已验签身份桥接到 PB
+await requestPrivyBridge({
+  email:        user.email.addresses[0].address,
+  method:       "google",
+  subject:      user.id,
+  access_token: jwt,  // usePrivy().getAccessToken()
+});
 
 logout();
 ```

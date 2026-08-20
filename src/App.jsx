@@ -1,5 +1,6 @@
 // 顶层装配
 import React, { useState, useEffect } from 'react';
+import { createRoot } from 'react-dom/client';
 import { StoreProvider, ToastProvider, useStore, useToast } from './state/store';
 import { Router, useRoute } from './utils/router';
 
@@ -145,5 +146,5 @@ function App() {
   );
 }
 
-const root = ReactDOM.createRoot(document.getElementById('root'));
+const root = createRoot(document.getElementById('root'));
 root.render(<App />);

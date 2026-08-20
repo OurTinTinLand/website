@@ -1,30 +1,8 @@
 #!/usr/bin/env node
-// post-build: 把 bundle 里 esm.sh dynamic require 替换为 window.React 全局引用
-// 三种形态都要处理：
-//   1. __toESM(__require("https://esm.sh/react@18"))      ← 默认导入（混合 import React, { x }）
-//   2. __require("https://esm.sh/react@18")               ← 纯命名导入 { x }
-//   3. __toESM(__require("https://esm.sh/react-dom@18")) ← react-dom
-//   4. import_reactN.default 已在全局替换
-//
-// 输出路径：build.js 已经把 bundle 写到 backend/pb_public/dist/bundle.js
-const fs = require('fs');
-const path = require('path');
-
-const BUNDLE = path.join(__dirname, 'backend', 'pb_public', 'dist', 'bundle.js');
-let src = fs.readFileSync(BUNDLE, 'utf8');
-
-// 1) __toESM(...) 包裹的形式（default 导入混 named）
-src = src.replace(/__toESM\(__require\("https:\/\/esm\.sh\/react@18"\)\)/g, 'window.React');
-src = src.replace(/__toESM\(__require\("https:\/\/esm\.sh\/react-dom@18"\)\)/g, 'window.ReactDOM');
-src = src.replace(/__toESM\(__require\("https:\/\/esm\.sh\/react-dom@18\/client"\)\)/g, 'window.ReactDOMClient');
-
-// 2) 直接 __require(...)（纯命名导入，不再走 __toESM）
-src = src.replace(/__require\("https:\/\/esm\.sh\/react@18"\)/g, 'window.React');
-src = src.replace(/__require\("https:\/\/esm\.sh\/react-dom@18"\)/g, 'window.ReactDOM');
-src = src.replace(/__require\("https:\/\/esm\.sh\/react-dom@18\/client"\)/g, 'window.ReactDOMClient');
-
-// 3) import_reactN.default 走全局
-src = src.replace(/import_react\d*\.default/g, 'window.React');
-
-fs.writeFileSync(BUNDLE, src);
-console.log('post-build OK: React globals wired → ' + BUNDLE);
+// v1.2 · ESM 改造后这个脚本是 no-op
+// 历史：之前 bundle.js 是 IIFE，里面会有 esbuild 输出的 `__require("https://esm.sh/react@18")` 这种
+//       形式；这个脚本负责把它们改成 `window.React` 全局引用，让打包更轻、避免重复下载。
+// 现在 bundle.js 是 ESM（`--format=esm`），并且 react alias 已经直接输出 esm.sh URL，
+// 浏览器自己有 importmap 处理，不需要全局 Rewrite。所以这个文件保留只为不破坏历史引用，
+// 实际什么都不做。
+console.log('[postbuild] v1.2·ESM: no-op (build.js emits ESM with esm.sh URLs directly)');

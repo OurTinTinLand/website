@@ -1,87 +1,65 @@
 // =============================================================================
-// Privy Provider Root —— 自适应 SDK / fallback
+// Privy Provider Root —— v1.2 静态版
 // =============================================================================
 //
-// 决策树：
+// 设计：
+//   - @privy-io/react-auth 是项目的 regular dep，已经在 node_modules 里
+//   - esbuild 在 build time 直接把它打进 bundle.js；不再需要运行时动态 import
+//   - 浏览器加载 ESM bundle，所有 React/Privy 共享一份 React 实例（都用 esm.sh React @18）
+//
+// 决策树（在浏览器里）：
 //
 //   PrivyProviderRoot（顶层组件）
-//     ├─ 有 window.PRIVY_APP_ID ?  → 包装 <PrivyProvider>（动态 import @privy-io/react-auth）
-//     │                              ├─ children        → 整个 React 应用子树
-//     │                              └─ SdkLoginEntry  → 在 LoginModal 里用
-//     └─ 无 window.PRIVY_APP_ID     → children 直通 + StandaloneLoginEntry
+//     ├─ window.PRIVY_APP_ID 存在  → 包 <PrivyProvider>（来自 @privy-io/react-auth 的静态 import）
+//     │                              ├─ children → 整个 React 应用子树
+//     │                              └─ LoginModal 用 <PrivyLoginEntry /> 触发 usePrivy().login()
+//     └─ window.PRIVY_APP_ID 不在    → children 直通；LoginModal 用 <PrivyStandaloneLogin/> 兜底
 //
-//   SdkLoginEntry：
-//     调 usePrivy().login()；PrivyAuthenticatedBridge 把已登录身份推到 onLogin
-//
-//   StandaloneLoginEntry（无 SDK）：
-//     渲染 <PrivyStandaloneLogin />；onLogin 直接拿 fake-OAuth demo 信息
-//
-// 所有调用方只 import `<PrivyLoginEntry onLogin onCancel />` 一个组件；
-// 它自己根据 SDK 是否可用切换内部实现。
+// 运行入口：<PrivyProviderRoot><App/></PrivyProviderRoot>（App.jsx 第 N 行）。
+// 唯一区分点：loginMethods 白名单 + 是否包 <PrivyProvider>。
 // =============================================================================
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import { PrivyProvider, usePrivy } from '@privy-io/react-auth';
 import { PrivyStandaloneLogin } from './PrivyStandalone.jsx';
 import { pickEmail, pickSubject, pickMethod } from './_privy-utils.js';
 import * as PB from '../../utils/pb-client.js';
 
-// ---- 1. Privy 配置自省 ----
+// ---- 1. 配置自省 ----
 function readPrivyConfig() {
-  if (typeof window === 'undefined') return { enabled: false, appId: '', methods: [] };
+  if (typeof window === 'undefined') return { enabled: false, appId: '', methods: [], clientId: '' };
   const appId = String(window.PRIVY_APP_ID || '').trim();
+  const clientId = String(window.PRIVY_CLIENT_ID || '').trim();
   const methods = String(window.PRIVY_LOGIN_METHODS || 'email,google,x,github,discord,wallet')
     .split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
-  const clientId = String(window.PRIVY_CLIENT_ID || '');
   return { enabled: !!appId, appId, methods, clientId };
 }
 
-// ---- 2. Privy Context：让子树知道 SDK 是否可用 ----
-const PrivyCtx = createContext({ enabled: false, sdkReady: false, methods: [] });
+// ---- 2. Context ----
+const PrivyCtx = createContext({ enabled: false, sdkReady: true, methods: [] });
 export function usePrivyStatus() {
   return useContext(PrivyCtx);
 }
 
-// ---- 3. 顶层 Provider：有 PRIVY_APP_ID 时套 <PrivyProvider>（动态 import） ----
+// ---- 3. PrivyProviderRoot 顶层 ----
+//
+// 何时包 <PrivyProvider>：cfg.enabled（PRIVY_APP_ID 存在）= true。
+// 由于 @privy-io/react-auth 静态 import 进了 bundle，"sdkReady" 在这里恒为 true
+// （保留它是为后续切回离线 fallback 留接口）。
 export function PrivyProviderRoot({ children }) {
   const cfg = readPrivyConfig();
-  const [sdk, setSdk] = useState({ status: 'idle', PrivyProvider: null });
 
-  useEffect(() => {
-    let alive = true;
-    if (!cfg.enabled) { setSdk({ status: 'idle', PrivyProvider: null }); return; }
-    setSdk({ status: 'loading', PrivyProvider: null });
-    ((s) => Function('s', 'return import(s)')(s))('@privy-io/react-auth')
-      .then((mod) => {
-        if (!alive) return;
-        setSdk({ status: 'ready', PrivyProvider: mod.PrivyProvider });
-      })
-      .catch((e) => {
-        if (!alive) return;
-        // eslint-disable-next-line no-console
-        console.warn('[PrivyProviderRoot] @privy-io/react-auth 未安装或加载失败:', e && e.message);
-        setSdk({ status: 'missing', PrivyProvider: null });
-      });
-    return () => { alive = false; };
-  }, [cfg.enabled]);
-
-  const ctx = { enabled: cfg.enabled, sdkReady: sdk.status === 'ready', methods: cfg.methods };
-
-  // 不挂 SDK → 直通 children（fallback 模式）
-  if (!cfg.enabled || sdk.status === 'missing') {
-    return <PrivyCtx.Provider value={ctx}>{children}</PrivyCtx.Provider>;
-  }
-
-  // SDK 加载中：先渲 children 占位，避免 loading 阶段 modal 拒绝渲染
-  if (sdk.status !== 'ready' || !sdk.PrivyProvider) {
+  if (!cfg.enabled) {
+    // 没配 APP_ID → 不包 Provider；children 直接渲染；LoginModal 会走 StandaloneLogin
     return (
-      <PrivyCtx.Provider value={ctx}>
+      <PrivyCtx.Provider value={{ enabled: false, sdkReady: true, methods: cfg.methods }}>
         {children}
       </PrivyCtx.Provider>
     );
   }
 
-  const Provider = sdk.PrivyProvider;
+  // 配置了 APP_ID → 真实包 PrivyProvider
   return (
-    <Provider
+    <PrivyProvider
       appId={cfg.appId}
       config={{
         loginMethods: cfg.methods,
@@ -94,95 +72,58 @@ export function PrivyProviderRoot({ children }) {
         },
       }}
     >
-      <PrivyCtx.Provider value={ctx}>{children}</PrivyCtx.Provider>
-    </Provider>
+      <PrivyCtx.Provider value={{ enabled: true, sdkReady: true, methods: cfg.methods }}>
+        {children}
+      </PrivyCtx.Provider>
+    </PrivyProvider>
   );
 }
 
-// ---- 4. <PrivyLoginEntry />：LoginModal 用，分发 SDK / standalone ----
+// ---- 4. <PrivyLoginEntry />：LoginModal 里唯一入口 ----
+//
+// 简化分支：
+//   - cfg.enabled  → 渲染 <PrivyButton />，里面调 usePrivy().login()
+//   - 没 cfg.enabled → 渲染 <PrivyStandaloneLogin />
 export function PrivyLoginEntry({ onLogin, onCancel }) {
   const status = usePrivyStatus();
 
-  // SDK 路径
-  if (status.enabled && status.sdkReady) {
-    return <SdkLoginEntry onLogin={onLogin} onCancel={onCancel} />;
+  if (status.enabled) {
+    return <PrivyButton onLogin={onLogin} onCancel={onCancel} />;
   }
-
-  // 等待 SDK 加载
-  if (status.enabled && !status.sdkReady) {
-    return <SdkLoadingEntry onCancel={onCancel} />;
-  }
-
-  // 离线兜底
   return <PrivyStandaloneLogin onLogin={onLogin} onCancel={onCancel} />;
 }
 
-// ---- 5. SDK 子组件：动态 import 后渲染（避免编译期硬绑定） ----
-function SdkLoadingEntry({ onCancel }) {
-  return (
-    <div className="privy-loading">
-      <p className="xs" style={{ margin: '0 0 14px', color: 'var(--ink-3)' }}>
-        <b>Privy SDK</b> 正在加载…若长时间未显示，请检查网络。
-      </p>
-      <div className="wl">
-        <a onClick={onCancel}>返回其他登录方式</a>
-      </div>
-    </div>
-  );
-}
+// ---- 5. <PrivyButton />（cfg.enabled=true 路径，里面调 usePrivy） ----
+function PrivyButton({ onLogin, onCancel }) {
+  const { ready, authenticated, user, getAccessToken, login, logout } = usePrivy();
 
-function SdkLoginEntry({ onLogin, onCancel }) {
-  const [M, setM] = useState(null);
-  useEffect(() => {
-    let alive = true;
-    ((s) => Function('s', 'return import(s)')(s))('@privy-io/react-auth')
-      .then((mod) => { if (alive) setM(() => mod); });
-    return () => { alive = false; };
-  }, []);
-  if (!M) return <SdkLoadingEntry onCancel={onCancel} />;
-  return <SdkLoginEntryInner M={M} onLogin={onLogin} onCancel={onCancel} />;
-}
-
-function SdkLoginEntryInner({ M, onLogin, onCancel }) {
-  const { usePrivy } = M;
-  return (
-    <SdkInnerOnce usePrivy={usePrivy}>
-      <SdkLoginBody M={M} onLogin={onLogin} onCancel={onCancel} />
-    </SdkInnerOnce>
-  );
-}
-
-// Privy 官方要求 usePrivy 调用必须严格在 <PrivyProvider> 子树中；
-// 我们已经在 PrivyProviderRoot 里包了，所以这里再嵌一层是 OK 的；
-// 但绝不能在 <PrivyProvider> 之外调 usePrivy。
-function SdkInnerOnce({ usePrivy, children }) {
-  const { ready } = usePrivy();
-  return ready ? children : <SdkLoadingEntry onCancel={null} />;
-}
-
-function SdkLoginBody({ M, onLogin, onCancel }) {
-  const { usePrivy } = M;
-  const { login, ready, authenticated, user, getAccessToken } = usePrivy();
-
-  // 用户已登录 → 触一次桥接；后续由 PrivyAuthenticatedBridge 监听
+  // 用户登录后 → 桥接到 PB /api/auth/privy-bridge
   useEffect(() => {
     if (!ready || !authenticated || !user) return;
     (async () => {
       try {
-        const email   = pickEmail(user);
+        const email = pickEmail(user);
         const subject = pickSubject(user);
-        const method  = pickMethod(user);
+        const method = pickMethod(user);
         let accessToken = '';
         try { accessToken = (await getAccessToken()) || ''; } catch (_) {}
         if (!email) return;
-        const data = await PB.requestPrivyBridge({ email, subject, method, access_token: accessToken });
-        if (onLogin) onLogin({ ...data, email, method, subject });
+        const data = await PB.requestPrivyBridge({
+          email,
+          subject,
+          method,
+          access_token: accessToken,
+        });
+        if (onLogin) await onLogin({
+          ...data,
+          email: data.record?.email || email,
+          method: data.login_method || method,
+          subject: data.subject || subject,
+        });
       } catch (e) {
-        // eslint-disable-next-line no-console
-        console.warn('[SdkLoginBody] bridge failed:', e);
+        console.warn('[PrivyButton] bridge failed:', e);
       }
     })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ready, authenticated, user && user.id]);
 
   return (
@@ -195,8 +136,8 @@ function SdkLoginBody({ M, onLogin, onCancel }) {
       <button
         type="button"
         className="lm"
-        disabled={!ready || authenticated}
-        onClick={() => { try { login(); } catch (e) { /* eslint-disable-next-line no-console */ console.warn(e); } }}
+        disabled={!ready}
+        onClick={() => { try { login(); } catch (e) { console.warn(e); } }}
         style={{ display: 'flex', alignItems: 'center', gap: 12 }}
       >
         <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 22, height: 22 }}>
@@ -211,13 +152,13 @@ function SdkLoginBody({ M, onLogin, onCancel }) {
         </p>
       )}
       <div className="wl" style={{ marginTop: 18 }}>
-        <a onClick={onCancel}>返回其他登录方式</a>
+        <a onClick={() => { try { logout(); } catch (_) {} onCancel && onCancel(); }}>返回其他登录方式</a>
       </div>
     </div>
   );
 }
 
-// 公共：检查环境是否配了 Privy（其它组件如 LoginModal 也可读）
+// ---- 6. Public helpers ----
 export function getPrivyEnabled() {
   return readPrivyConfig().enabled;
 }

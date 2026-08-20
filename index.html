@@ -17,31 +17,24 @@
   <link rel="stylesheet" href="src/styles/modals.css">
   <link rel="stylesheet" href="src/styles/pages.css">
 
-  <!-- React UMD（运行时由 window.React / window.ReactDOM 提供） -->
-  <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
-  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
-
   <!--
-    Privy SDK 浏览器侧动态加载（spec §6.4）
-    ----------------------------------------------------------------------
-    PrivyProviderRoot 里用 Function('s','return import(s)')() 的方式动态 import，
-    这样 esbuild 不在 build time 强制解析（避免沙盒/无 SDK 部署时构建失败）。
-
-    浏览器裸 specifier（如 '@privy-io/react-auth'）需要 importmap 解析到完整 URL；
-    我们把这条映射指到 esm.sh — 它会自动 assemble 整个 dep 子树
-    （@privy-io/api-base / popup / wagmi / viem / @solana/kit 等）一并吐回。
-
-    版本固定 ^3.35.0 与 package.json optionalDependencies 对齐；>= Chrome 89 / Safari 16.4 / Firefox 108 都支持 importmap。
-    不支持 importmap 的老浏览器 → dynamic import 报错 → 走 catch → PrivyStandaloneLogin fallback。
+    v1.2 全 ESM 化（spec §6.4 / §14.6）
+    ------------------------------------------------------
+    bundle.js 是 ES Module（type="module"），浏览器以 module 加载它。
+    - 应用代码：esbuild --alias 把 'react' / '@privy-io/react-auth' / 'wagmi' / 'viem'
+      等替换为完整 esm.sh URL，直接 fetch。
+    - esm.sh 自己吐出的 shim（处理依赖树）可能含 bare import（如 `import React from "react"`），
+      这些都走下面这个 importmap。
+    单一 React 实例（来自 esm.sh/react@18）：bundled React 与 Privy 内部模块共享。
   -->
   <script type="importmap">
   {
     "imports": {
-      "@privy-io/react-auth": "https://esm.sh/@privy-io/react-auth@^3.35.0",
       "react": "https://esm.sh/react@18.3.1",
       "react-dom": "https://esm.sh/react-dom@18.3.1",
       "react-dom/client": "https://esm.sh/react-dom@18.3.1/client",
-      "react/jsx-runtime": "https://esm.sh/react@18.3.1/jsx-runtime"
+      "react/jsx-runtime": "https://esm.sh/react@18.3.1/jsx-runtime",
+      "react/jsx-dev-runtime": "https://esm.sh/react@18.3.1/jsx-dev-runtime"
     }
   }
   </script>
@@ -49,26 +42,23 @@
 <body>
   <div id="root"></div>
   <!--
-    占位：PB onServe 钩子（backend/pb_hooks/inject_secrets.pb.js）会在 HTML 响应
-    阶段把下面这个注释替换成：
-      <script>window.PB_ADMIN_DEMO_SECRET="...";</script>
-    供前端 demo admin 流使用。
-    占位为空时钩子什么也不注入（demo admin 自动 401）。
+    占位：start.sh 在容器启动前用 python3 替换 → <script>window.PB_ADMIN_DEMO_SECRET="...";</script>
+    占位为空时（dev 模式没设 secret）→ 注释保留，frontend 不读 window.PB_ADMIN_DEMO_SECRET
   -->
   <!--INJECT:PB_ADMIN_DEMO_SECRET-->
 
   <!--
-    占位 2：start.sh 在容器启动前把这段注释替换成：
-      <script>
-        window.PRIVY_APP_ID="...";
-        window.PRIVY_CLIENT_ID="...";
-        window.PRIVY_LOGIN_METHODS="email,google,x,github,discord,wallet";
-      </script>
-    供前端 PrivyProvider 初始化使用。
-    没设置 PRIVY_APP_ID 时占位保留为注释 → 前端自动走"无 SDK 兜底"（OAuth 直连）。
+    占位 2：start.sh 注入 → window.PRIVY_APP_ID / window.PRIVY_CLIENT_ID / window.PRIVY_LOGIN_METHODS
+    没设 PRIVY_APP_ID 时占位保留为注释 → PrivyProviderRoot 走 fallback（无 SDK OAuth 直连）
   -->
   <!--INJECT:PRIVY_CONFIG-->
 
-  <script src="dist/bundle.js"></script>
+  <!--
+    v1.2：bundle.js 是 ES Module（--format=esm）。所有依赖（react / @privy-io/react-auth / viem / wagmi 等）
+          已经由 esbuild 在 build 时通过 --alias:react=https://esm.sh/react@18
+          把 'react' import 重写到 esm.sh URL，浏览器会直接 fetch。
+          单一 React 实例；无 context 冲突（修 v1.2 上线后报的 "useContext null" 报错）。
+  -->
+  <script type="module" src="dist/bundle.js"></script>
 </body>
 </html>

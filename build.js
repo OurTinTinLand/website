@@ -58,13 +58,23 @@ const args = [
   `--outfile=${path.join(PUBLIC, 'dist', 'bundle.js')}`,
   '--jsx=transform',
   '--loader:.jsx=jsx',
-  '--format=iife',
+  '--format=esm',
   '--target=es2020',
   '--define:process.env.NODE_ENV=\'"development"\'',
   '--sourcemap=inline',
   `--alias:react=https://esm.sh/react@18`,
   `--alias:react-dom=https://esm.sh/react-dom@18`,
   `--alias:react-dom/client=https://esm.sh/react-dom@18/client`,
+  // v1.2 ESM 化（spec §6.4）：
+  //   大包（@privy-io/react-auth / wagmi / viem / zustand 等）走 esm.sh CDN；
+  //   用户浏览器在首次加载时 fetch，CDN 有缓存。bundle.js 只剩下应用代码 + React。
+  //   alias 写完整 URL → 不需要 importmap，浏览器直接 fetch。
+  '--alias:@privy-io/react-auth=https://esm.sh/@privy-io/react-auth@3.37.4',
+  '--alias:wagmi=https://esm.sh/wagmi@2.12.0',
+  '--alias:viem=https://esm.sh/viem@2.21.0',
+  '--alias:@wagmi/connectors=https://esm.sh/@wagmi/connectors@5.1.0',
+  '--alias:zustand=https://esm.sh/zustand@4.5.0',
+  '--alias:@solana/kit=https://esm.sh/@solana/kit@2.0.0',
   '--log-level=info',
 ];
 

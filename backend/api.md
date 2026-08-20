@@ -177,7 +177,7 @@ POST /api/auth/wallet/verify
 
 ```js
 import { requestEmailCode, verifyEmailCode,
-         getWalletNonce, verifyWallet, logout } from "../backend/pb-client.js";
+         getWalletNonce, verifyWallet, logout } from "../src/utils/pb-client.js";
 
 // 邮箱
 await requestEmailCode("user@example.com");
@@ -349,13 +349,13 @@ Authorization: <user token>
 
 ## 8. 与 React SPA 的对接
 
-`backend/pb-client.js` 是一个轻量浏览器端 SDK（无需打包），封装 fetch + 错误处理。
+`src/utils/pb-client.js` 是一个轻量浏览器端 SDK（无需打包），封装 fetch + 错误处理。
 完整方法列表见文件末尾 `export default {...}`。
 
 ```js
 import { aiRoute, listCoursesNormalized, requestEmailCode, verifyEmailCode,
          createOrder, resendAdvisorCode, listJobPostingsNormalized,
-         listTalentProfilesNormalized, getUserProfileNormalized } from "../backend/pb-client.js";
+         listTalentProfilesNormalized, getUserProfileNormalized } from "../src/utils/pb-client.js";
 
 // 首页假 AI 路由
 const r = await aiRoute("想学 AI Agent");
@@ -381,7 +381,7 @@ await createSignup({
 const me = await getUserProfileNormalized(myRecord.id);
 ```
 
-后端 base URL 通过 `window.PB_URL` 注入，缺省 `http://127.0.0.1:8090`。
+后端 base URL 已简化：浏览器全部用相对路径 `/api/*`，由 `pb_public` 同源托管保证。
 
 ---
 

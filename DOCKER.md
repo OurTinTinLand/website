@@ -1,154 +1,178 @@
-# TinTinLand · Docker 部署说明
+# Docker / Railway 部署说明
 
-## 文件清单
+> 本文档配套 v2 单进程架构（pocketbase + pb_public 同源托管）。如果你在 v1
+> 双容器 / Node 反代时代部署过，请看"老架构迁移"小节。
+
+## 1. 文件清单
 
 | 文件 | 用途 |
 |---|---|
-| `Dockerfile` | **统一镜像** · 前端 + PocketBase 共容器、单 PORT（推荐） |
-| `Dockerfile.frontend` | 仅前端 Web 服务（分离部署时用） |
-| `Dockerfile.backend` | 仅 PocketBase 后端服务（分离部署时用） |
-| `start.sh` | 统一镜像的启动脚本（先起 PB，再 exec Node）|
-| `.dockerignore` | 统一构建时排除项（设计源 / spec / 后端数据） |
-| `railway.toml` | Railway 默认配置（统一镜像） |
-| `railway.backend.toml` | Railway 备选配置（仅分离部署时用） |
+| `Dockerfile` | 单进程镜像构建（pocketbase + pb_public） |
+| `start.sh` | 容器启动脚本（superuser upsert + `pocketbase serve`） |
+| `railway.toml` | Railway 单 Service 配置（默认指向 `Dockerfile`） |
+| `backend/pb_hooks/` | PocketBase 钩子（含 `inject_secrets.pb.js` 注入 `window.PB_ADMIN_DEMO_SECRET`） |
+| `backend/pb_migrations/` | PocketBase schema 迁移（spec v1.1） |
+| `backend/pb_public/` | 静态前端（构建产物：`index.html` + `dist/` + `src/styles/` + `assets-claude/`） |
+| `build.js` | esbuild 打包到 `backend/pb_public/` |
+| `.dockerignore` | 排除 `pb_data`、`pb_public`（运行时重新生成）等 |
 
-## 三种部署形态
+## 2. 架构
 
-### A. 统一镜像（推荐 · 单 Service）
+```
+浏览器 ──► Railway PORT (3000)
+              │
+              ▼
+        ┌────────────────────────────────┐
+        │  Docker container (alpine)     │
+        │  ┌─────────────────────────┐   │
+        │  │ pocketbase :3000        │   │   ←── /api/* + /_* + 静态文件
+        │  │  ├─ API routes          │   │       单 PORT 单进程
+        │  │  ├─ Admin UI /_/        │   │       无 Node 反代层
+        │  │  └─ --publicDir=/pb_public ─►│  ← index.html / dist/ / src/styles/
+        │  │     + onServe hook 注入 │   │
+        │  └─────────────────────────┘   │
+        │       │                        │
+        │       ▼                        │
+        │  /pb_data  ──► Railway Volume  │   ← 持久化 PB 数据
+        └────────────────────────────────┘
+```
+
+关键点：
+
+- **单 PORT 单进程**：pocketbase 同时 serve 静态文件、API、`/_/` admin UI。
+- **浏览器同源**：所有 `/api/*` 调用都是相对路径，天然免 CORS / host 头 / cookie domain 问题。
+- **钩子注入 secret**：`window.PB_ADMIN_DEMO_SECRET` 由 `backend/pb_hooks/inject_secrets.pb.js` 的 `onServe` 钩子在 HTML 响应阶段注入，不进 git 不进镜像。
+- **数据持久化**：`/pb_data` 挂 Railway Volume（`[[deploy.volumes]]` 在 `railway.toml` 声明）。
+
+## 3. Railway 部署
+
+### 3.1 一键（最简）
+
+1. Railway → New Project → Deploy from GitHub → 选这个仓库
+2. Railway 自动检测 `railway.toml` + `Dockerfile`，开始构建
+3. Railway Service → Settings → Volumes → 添加 Volume：
+   - Mount Path: `/pb_data`
+   - Name: `pb-data`（必须与 `railway.toml` 一致）
+4. Railway Service → Variables → 添加：
+   - `PB_ADMIN_DEMO_SECRET` = 一个长随机串（运营后台 secret）
+   - 可选：`PB_ORIGINS` = `https://your-domain.example.com`
+5. 等待构建完成 → Railway 给你一个 `*.up.railway.app` 域名
+
+### 3.2 自定义域名
+
+Railway Service → Settings → Domains → 添加 `tintin.land`（按 Railway 提示配 DNS）。
+
+### 3.3 环境变量
+
+| 变量 | 必需 | 默认 | 说明 |
+|---|---|---|---|
+| `PORT` | 自动注入 | `3000` | Railway 自动注入；本地默认 3000 |
+| `PB_ADMIN_EMAIL` | 否 | `admin@tintin.land` | 超管邮箱 |
+| `PB_ADMIN_PASSWORD` | **生产必改** | `tintinland2026` | 超管密码（首次启动 upsert 到 PB） |
+| `PB_ADMIN_DEMO_SECRET` | **生产必设** | `""` | 运营后台 demo 入口 secret；不设则 demo admin 401 |
+| `PB_ORIGINS` | 否 | `*` | 逗号分隔的 CORS allowlist |
+| `RAILWAY_VOLUME_MOUNT_PATH` | 自动注入 | — | Railway 注入的 Volume 挂载点；start.sh 自动跟随 |
+
+## 4. 本地构建/运行
+
+### 4.1 一次性构建 + 跑
+
+```bash
+# 1) 构建前端到 backend/pb_public/
+npm run build
+
+# 2) 起 PB（前台，Ctrl+C 退出）
+bash backend/start.sh
+# 或：
+npm run serve:pb
+```
+
+浏览器打开 `http://127.0.0.1:8090/`。
+
+### 4.2 开发循环（watch + serve）
+
+终端 A：
+```bash
+npm run watch           # 监听 src/ 改动自动重建到 backend/pb_public/
+```
+
+终端 B：
+```bash
+npm run serve:pb        # 起 PB（前台）
+```
+
+### 4.3 Docker 本地构建
 
 ```bash
 docker build -t tintinland-all .
 docker run --rm -p 3000:3000 \
   -e PORT=3000 \
+  -e PB_ADMIN_DEMO_SECRET=dev-secret-12345678 \
+  -e PB_ORIGINS="http://localhost:3000" \
   -v $PWD/backend/pb_data:/pb_data \
   tintinland-all
+curl http://localhost:3000/
+curl http://localhost:3000/api/health
 ```
 
-**架构**：
+## 5. 老架构迁移（如果你之前用 Node + 反代）
 
+老架构：
+- 两个进程：node `server.js`（静态 + 反代）+ `pocketbase`（API）
+- 两个 PORT：内部 `PB_PORT=8090`，外部 `${PORT}`
+- 反代层：`/api/*` + `/_/*` 经 node 转发到 PB
+- URL 概念：`PB_URL` / `window.PB_URL` / `PUBLIC_PB_URL` 三套
+
+新架构：
+- 一个进程：`pocketbase --publicDir=pb_public`
+- 一个 PORT：直接 `${PORT}`（不再有内部 PB_PORT）
+- 无反代层：所有请求 pocketbase 自己处理
+- 无 URL 概念：浏览器全部用相对路径
+
+迁移步骤：
+
+1. 拉新代码
+2. 重新构建：`npm run build`（产物落到 `backend/pb_public/`）
+3. Railway 重新部署（自动触发）：新镜像只有一个进程 + 一个端口
+4. **保留** `pb-data` Volume（PB schema / 数据不动）
+5. **保留** `PB_ADMIN_EMAIL` / `PB_ADMIN_PASSWORD` / `PB_ADMIN_DEMO_SECRET` 环境变量
+6. **删除** `PB_PORT` 环境变量（不再使用）
+7. **删除** `PUBLIC_PB_URL` / `PB_URL` 环境变量（不再使用 —— 这是 v1 的 bug 之一）
+
+## 6. 故障排查
+
+### 6.1 浏览器仍调 127.0.0.1:8090
+
+老的 `dist/bundle.js` 还在被浏览器缓存，或者镜像里的 `pb_public/` 还是老的。
+
+排查：
+```bash
+curl -sS https://your-app.example.com/ | grep -E "PB_URL|127\.0\.0\.1"
+# 期望：没有任何匹配（index.html 不再含 PB_URL 注入块）
 ```
-┌─── container ──────────────────────────┐
-│                                        │
-│   tini (PID 1)                         │
-│     └─ /start.sh                        │
-│          ├─ /pb/pocketbase :8090 (内部) │
-│          └─ node server.js   :3000 ─────┼─► Railway PORT
-│                └─ proxy /api/* /_/* ───►│  PB :8090 (loopback)
-│                                        │
-└────────────────────────────────────────┘
-```
 
-- **优点**：1 个 service = 1 个最小实例，省钱；零网络配置
-- **缺点**：不能独立扩容前后端
+修法：
+1. 强制刷新（Cmd+Shift+R）
+2. 确认镜像里的 `pb_public/` 是新的（`docker run --rm tintinland-all ls /pb_public/`）
 
-### B. 分离部署（两个 Service）
+### 6.2 /api/health 返回 502
+
+PB 还没起来，或者 hooks 加载失败。检查日志：
 
 ```bash
-# 前端
-docker build -f Dockerfile.frontend -t tintinland-web .
-docker run --rm -p 3000:3000 -e PORT=3000 tintinland-web
-
-# 后端（注意：必须 -v 挂载，否则 PB 数据每次重启清零）
-docker build -f Dockerfile.backend -t tintinland-pb .
-docker run --rm -p 8090:8090 \
-  -e PORT=8090 \
-  -v $PWD/backend/pb_data:/pb_data \
-  tintinland-pb
+docker logs <container-id>
+# 期望看到：
+# [admin_proxy.pb.js] LOADED
+# [auth.pb.js] LOADED v1.1
+# [inject_secrets.pb.js] LOADED
+# ...
+# [start.sh] bootstrapping superuser ...
+# Server started at http://0.0.0.0:3000
 ```
 
-> Railway 上分离部署：把 `railway.toml` 的 `dockerfilePath` 改成 `Dockerfile.frontend`，
-> 另起一个 Service 用 `railway.backend.toml`（也含 `[[deploy.volumes]]` 声明）。
+### 6.3 demo admin 一直 401
 
-**架构**：
-
-```
-frontend (Railway Service #1)     backend (Railway Service #2)
-┌────────────────────┐            ┌────────────────────┐
-│ node server.js     │   ──────►  │ pocketbase :8090   │
-│  :3000 (公网)       │  内部 DNS │                    │
-│                    │            │                    │
-└────────────────────┘            └────────────────────┘
-```
-
-- **优点**：前后端独立扩容、独立重启
-- **缺点**：需要给前端配置 PB 内部 DNS（如 `pb.railway.internal`）
-
-### C. 本地开发（无需 Docker）
-
-```bash
-# 1. 起后端
-cd backend && ./pocketbase serve --http=127.0.0.1:8090
-
-# 2. 起前端（不带 PB_URL，纯静态）
-PORT=8123 node server.js
-```
-
-或起前端 + 启用代理指向本地 PB：
-
-```bash
-PORT=8123 PB_URL=http://127.0.0.1:8090 node server.js
-# → http://localhost:8123/api/* 会被 server.js 反向代理到 PB
-```
-
-## 反向代理规则
-
-`server.js` 在设置了 `PB_URL` 环境变量时启用反向代理：
-
-| 请求前缀 | 处理方式 |
-|---|---|
-| `/api/*` | 代理到 PB（REST API） |
-| `/_/*`  | 代理到 PB（管理后台 UI） |
-| 其他    | 由 server.js 静态服务 |
-
-代理支持 WebSocket upgrade（PB 实时订阅用得到）。
-
-## Railway 部署（统一镜像）
-
-1. **创建项目** → New Project → Deploy from GitHub repo
-2. **自动检测** `Dockerfile`（默认就是 `Dockerfile` = 统一镜像）
-3. **Volume 声明**已在 `railway.toml` 里通过 `[[deploy.volumes]]` 完成：
-   ```toml
-   [[deploy.volumes]]
-   mountPath = "/pb_data"
-   name = "pb-data"
-   ```
-   Railway 部署时自动建一个名为 `pb-data` 的 Volume，容器内挂到 `/pb_data`。
-   ⚠️ **不要在 Dockerfile 里写 `VOLUME` 指令** — Railway build 会报错：
-   `docker VOLUME at line X is not supported, use Railway Volumes`。
-4. **自动注入** `PORT`，无需额外配置
-5. **验证**：
-   - `https://<your-app>.up.railway.app/` → 看到官网首页
-   - `https://<your-app>.up.railway.app/api/health` → `{"message":"API ishealthy."}`
-   - `https://<your-app>.up.railway.app/api/collections/courses/records` → 课程数据
-   - `https://<your-app>.up.railway.app/_/` → PB 管理后台
-
-> Volume 数据会在每次 deploy 时保留（PB 自动跑 migrations 创建表结构）。
-> 删除 Volume 会清空所有数据，谨慎操作。
-
-## 镜像大小
-
-| 镜像 | 大小 | 说明 |
-|---|---|---|
-| `tintinland-all`（统一） | ~180 MB | alpine + nodejs + PocketBase 单二进制 + 前端产物 |
-| `tintinland-web`（仅前端） | ~136 MB | multi-stage node:20-alpine |
-| `tintinland-pb`（仅后端） | ~41 MB | alpine:3.20 + PocketBase 单二进制 |
-
-## 切到分离部署
-
-如果未来需要独立扩容，把 `railway.toml` 改成：
-
-```toml
-[build]
-dockerfilePath = "Dockerfile.frontend"
-```
-
-然后 Railway Dashboard 再 New Service → `Dockerfile.backend` + `railway.backend.toml`。
-
-## V1.1 可缓
-
-- 统一镜像里前端目前是纯静态 mock，未实际调用 PB API；接入需要新增 fetch 层
-- WebSocket 代理已实现但未在生产验证（PB 实时订阅场景）
-- `/_/*` 反向代理会泄露 PB 管理后台；生产环境需要：
-  1. PB 用 `pocketbase superuser upsert EMAIL PASS` 创建 superuser
-  2. 加 Cloudflare Access 或类似零信任网关保护 `/_/*`
-  3. 或者改用分离部署，PB service 不开公网
+`PB_ADMIN_DEMO_SECRET` 没设。检查：
+1. Railway Variables 里有没有 `PB_ADMIN_DEMO_SECRET`
+2. 浏览器 console 里看 `window.PB_ADMIN_DEMO_SECRET` 是不是 undefined（说明 onServe hook 没注入 —— 容器环境变量可能没传进去）
+3. 查看响应源码：`curl -sS https://your-app.example.com/ | grep PB_ADMIN_DEMO_SECRET`

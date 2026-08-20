@@ -1,34 +1,25 @@
 // =============================================================================
-// TinTinLand Backend —— 浏览器端 SDK（已在 src/utils/ 镜像）
+// TinTinLand Backend —— 浏览器端 SDK
 // =============================================================================
 //
 // 轻量 fetch 封装，给 esbuild+UMD React SPA 用（无需 npm install pocketbase）。
 // 所有方法返回 Promise；错误统一抛 PbError。
 //
-// 起源：backend/pb-client.js（早期放在 backend/，前端 V1.1 起改放 src/utils/，
-//      跟其它前端工具同级更直观；backend/pb-client.js 保留为向后兼容）。
+// 调用约定：所有 API 用相对路径（'/api/...'、'/_/...'）。
+//   - dev / staging / prod 一致，永远相对当前 origin
+//   - 由 PocketBase 的 pb_public 静态托管保证同源：浏览器加载页面后，
+//     fetch('/api/...') 永远走同一个 origin 的 /api/* 处理
+//   - dev：直接 ./backend/pocketbase serve --publicDir=backend/pb_public
+//   - prod：Dockerfile 单容器跑 PB 同一进程（Railway 统一 Service）
 //
-// URL 解析（index.html 在 <head> 里注入 window.PB_URL）：
-//   - Dev (PORT=8123)：http://127.0.0.1:8090  （PB 直接连）
-//   - Prod (Railway 统一镜像)：window.location.origin（Node /api/* 反代）
-//   - 自定义覆盖：window.PB_URL 在 build/runtime 注入
+// 之前有过一整套 base URL 机制（PB_URL / window.PB_URL / PUBLIC_PB_URL）
+// 加 Node 反代层，已完全删除。同源托管天然免去 host 头 / cookie domain
+// / CORS preflight / 反代 header 修复这些坑。
 //
-// URL 解析优先级：
-//   1. window.PB_URL（index.html / build 注入）→ 强制覆盖
-//   2. window.location.port === "8090" → 当前就是 PB 后端（极少用）
-//   3. 否则尝试 fetch `/api/health`：能通就用同源（即 Node 反代，相对路径）
-//   4. 兜底：直接连 http://127.0.0.1:8090（dev 默认 PB 端口）
-// 这样：dev (port 8123/8127) → 自动连 8090；统一镜像 prod → 走 /api 反代
-const PB_URL = (() => {
-    if (typeof window === "undefined") return "http://127.0.0.1:8090";
-    if (window.PB_URL) return window.PB_URL;
-    if (window.location && window.location.port === "8090") return window.location.origin;
-    // 默认：连本机 8090（dev 最常见）。生产环境应在 index.html 注入 window.PB_URL。
-    return "http://127.0.0.1:8090";
-})();
+const PB_URL = "";   // 永远相对当前 origin（由 PocketBase pb_public 同源托管保证）
 // ─── 运营后台 token：不再在前端硬编码超管凭据 ───
 // 历史：曾经把 SUPERUSER_EMAIL/PASSWORD 直接写在前端，任何 DevTools 都能拿到。
-// 现在：前端只有 window.PB_ADMIN_DEMO_SECRET（由 server.js 从环境变量注入），
+// 现在：前端只有 window.PB_ADMIN_DEMO_SECRET（由 PB onServe 钩子从 PB_ADMIN_DEMO_SECRET 环境变量注入），
 // 凭这个 secret 调 /api/admin/superuser-token 拿后端现签的超管 token。
 // secret 错 / 没配：后端 401，整个 admin 流不可用。
 function getDemoSecret() {
@@ -123,8 +114,7 @@ async function req(method, path, body, token, extraHeaders) {
     return data || {};
 }
 
-export { PB_URL };
-
+// PB_URL 留作模块内常量（恒为 ""），不再对外 export。新代码直接用相对路径 fetch。
 // ---- superuser helpers（运营后台用：调后端 /api/admin/superuser-token 换短命 token） ----
 let _cachedSuperToken = null;
 let _cachedSuperExp = 0;

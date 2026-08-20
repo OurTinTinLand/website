@@ -9,10 +9,10 @@
 ```
 backend/
 ├── pocketbase              ← v0.39.11 二进制
-├── .env                    ← PB_URL + 超级管理员账号
+├── .env                    ← PocketBase 超级管理员账号 + demo secret（PB_ADMIN_EMAIL / PB_ADMIN_PASSWORD / PB_ADMIN_DEMO_SECRET）
 ├── README.md               ← 本文件
 ├── api.md                  ← 给前端看的 REST API 速查
-├── pb-client.js            ← 浏览器端 fetch 封装，可被 src/*.jsx 直接 import
+## 注：旧的 `backend/pb-client.js` 已被 `src/utils/pb-client.js` 完全替代（同源架构下不再需要 backend/ 镜像），已删除。
 ├── pb_data/                ← PocketBase 数据目录（含 SQLite + types.d.ts）
 ├── pb_migrations/          ← JS 迁移文件
 │   ├── 1755000000_init_collections.js     ← v1.0：10 个 collection 的 schema
@@ -51,8 +51,8 @@ curl http://127.0.0.1:8090/api/health
 
 > V1.1 部署：通过 `PB_ADMIN_EMAIL` / `PB_ADMIN_PASSWORD` 环境变量覆盖默认值。
 > `Dockerfile` + `start.sh` 启动时会跑 `pocketbase superuser upsert`（幂等），自动落库。
-> `server.js` 同时把这两个值注入到 `index.html` 的 `window.PB_ADMIN_EMAIL/PASSWORD`，
-> 前端 `src/utils/pb-client.js` 会优先读运行时注入，避免硬编码密码过期导致 401。
+> `backend/pb_hooks/inject_secrets.pb.js`（onServe 钩子）把 `window.PB_ADMIN_DEMO_SECRET` 注入到 `index.html`，
+> 前端 `src/utils/pb-client.js` 读这个 secret 去调 `/api/admin/superuser-token` 拿后端现签的超管 token。
 
 ### 1.1 数据目录与持久化 Volume
 
@@ -136,7 +136,7 @@ mv pb_data pb_data.bak
 import { aiRoute, listCoursesNormalized,
          requestEmailCode, verifyEmailCode,
          createOrder, resendAdvisorCode,
-         listJobPostingsNormalized, listTalentProfilesNormalized } from "../../backend/pb-client.js";
+         listJobPostingsNormalized, listTalentProfilesNormalized } from "../../src/utils/pb-client.js";
 
 // 首页假 AI
 const r = await aiRoute("想学 AI Agent");
@@ -158,7 +158,7 @@ await createOrder({
 });
 ```
 
-后端 base URL 通过 `window.PB_URL` 覆盖（缺省 `http://127.0.0.1:8090`）。
+后端 base URL 已简化：浏览器全部用相对路径 `/api/*`，由 `pb_public` 同源托管保证。
 
 ## 5. 与 spec v1.1 的对齐情况
 

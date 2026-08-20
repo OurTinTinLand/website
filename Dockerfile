@@ -1,18 +1,17 @@
 # syntax=docker/dockerfile:1.7
 # ============================================================
-# TinTinLand 新官网 · 统一镜像（前端 + PocketBase）
+# TinTinLand 新官网 · 单进程镜像（pocketbase + pb_public）
 # ------------------------------------------------------------
 # 单容器、单 PORT 部署：
-#   - Node server.js 监听 ${PORT}（Railway 注入），
-#     对 /api/* 与 /_/* 反向代理到容器内的 PocketBase
-#   - PocketBase 监听内部 ${PB_PORT}（默认 8090，不暴露公网）
-#   - tini 当 PID 1，负责信号转发与僵尸进程回收
+#   - PocketBase 自己 serve 静态文件（pb_public）+ API（/api/* + /_/*）
+#   - 不再有 Node 反代层，所有 API 浏览器同源调用
+#   - onServe 钩子（inject_secrets.pb.js）注入 window.PB_ADMIN_DEMO_SECRET
 #
-# 与单服务镜像的区别：
-#   - Dockerfile.frontend + Dockerfile.backend：两个 Railway Service
-#   - 本 Dockerfile：一个 Railway Service，省钱省事
+# 部署架构对比：
+#   - 老 Dockerfile：node builder + alpine runtime（含 node + pb 两个进程 + 反代层）
+#   - 本 Dockerfile：node builder + alpine runtime（仅含 pb 一个进程）
 #
-# Railway 部署（推荐这个，省一个 Service）：
+# Railway 部署：
 #   1. New Service → Dockerfile（默认指向本文件）
 #   2. Volume → /pb_data
 #   3. 自动注入 PORT，无需额外配置
@@ -23,22 +22,15 @@
 #     -e PORT=3000 \
 #     -e PB_ADMIN_EMAIL=admin@tintin.land \
 #     -e PB_ADMIN_PASSWORD=tintinland2026 \
+#     -e PB_ADMIN_DEMO_SECRET=tintinland2026 \
 #     -e PB_ORIGINS="http://localhost:3000" \
 #     -v $PWD/backend/pb_data:/pb_data \
 #     tintinland-all
 #   curl http://localhost:3000/
-#   curl http://localhost:3000/api/health   # 经 Node 代理
-#   curl http://localhost:3000/api/collections/courses/records
-#
-# 超管账号（PB_ADMIN_EMAIL / PB_ADMIN_PASSWORD）：
-#   - start.sh 会用 `pocketbase superuser upsert` 把超管账号写到 /pb_data，
-#     幂等（首次创建、后续覆盖密码）。
-#   - 默认值与 src/utils/pb-client.js 硬编码一致；生产环境务必改默认值。
-#   - server.js 会把这两个值注入到 index.html 的 window.PB_ADMIN_EMAIL/PASSWORD，
-#     前端运营后台会用最新值调用 PB，不再吃硬编码的过期密码。
+#   curl http://localhost:3000/api/health
 # ============================================================
 
-# ---- Stage 1: 装 node + 构建前端 + 拉 PocketBase ----
+# ---- Stage 1: 装 node + esbuild + 构建前端到 backend/pb_public/ ----
 FROM node:20-alpine AS builder
 WORKDIR /app
 
@@ -46,29 +38,30 @@ WORKDIR /app
 COPY package.json package-lock.json* ./
 RUN npm ci --no-audit --no-fund
 
-# 再拷贝源码
+# 再拷贝源码（build.js 会把产物落到 backend/pb_public/）
 COPY . .
 
-# esbuild 把 src/App.jsx 编译成 dist/bundle.js
-# postbuild.js 把 esm.sh 的 React 引用替换为 window.React
+# build.js 负责：
+#   - 把 index.html / src/styles / assets-claude 拷到 backend/pb_public/
+#   - esbuild 把 src/App.jsx 编译到 backend/pb_public/dist/bundle.js
+#   - postbuild.js 把 esm.sh 的 React 引用替换为 window.React
 RUN npm run build
 
-# ---- Stage 2: 运行时（alpine 单一基础）----
+# ---- Stage 2: 运行时（alpine + pocketbase）----
 FROM alpine:3.20
 # PocketBase 版本对齐：
 #   - backend/api.md / pb_hooks 中注释都明确写 "PocketBase v0.39 内置"（newAuthToken 等 API）。
-#   - 历史 Dockerfile 写 0.27.2，但 hooks 用 v0.39 行为 —— 在 v0.27 上会失败或不一致。
 #   - 这里锁到 v0.39.x 跟代码注释、api.md、本地 ./backend/pocketbase 二进制对齐。
 #   - 升级前请跑一次 migration 验证（pb_data 跨小版本可恢复；大版本需 dump/restore）。
 ARG PB_VERSION=0.39.11
 ARG TARGETARCH=amd64
 
 LABEL org.opencontainers.image.title="tintinland-all" \
-      org.opencontainers.image.description="TinTinLand 新官网 · 统一镜像（前端 + PocketBase 单 PORT）" \
+      org.opencontainers.image.description="TinTinLand 新官网 · 单进程镜像（pocketbase + pb_public）" \
       org.opencontainers.image.source="https://github.com/tintinland/tintindog"
 
-# 1) 系统包：nodejs（静态服务器）、npm、tini（PID 1）、wget（健康检查）、ca-certificates
-RUN apk add --no-cache nodejs npm tini wget ca-certificates
+# 1) 系统包：tini（PID 1）、wget（健康检查）、ca-certificates、python3（start.sh 注入 secret 用）
+RUN apk add --no-cache tini wget ca-certificates python3
 
 # 2) 拉 PocketBase 二进制（amd64 / arm64 自动）
 RUN case "${TARGETARCH}" in \
@@ -82,26 +75,23 @@ RUN case "${TARGETARCH}" in \
  && rm /tmp/pb.zip \
  && chmod +x /pb/pocketbase
 
-# 3) 前端构建产物（从 builder stage 拷过来）
-WORKDIR /app
-COPY --from=builder /app/server.js  ./server.js
-COPY --from=builder /app/index.html ./index.html
-COPY --from=builder /app/dist       ./dist
-COPY --from=builder /app/src/styles ./src/styles
-COPY --from=builder /app/assets-claude ./assets-claude
+# 3) 前端构建产物（从 builder stage 拷过来；PocketBase --publicDir 直接 serve）
+COPY --from=builder /app/backend/pb_public /pb_public
 
-# 4) 后端 hooks + migrations
+# 4) 后端 hooks（含 inject_secrets.pb.js 注入 window.PB_ADMIN_DEMO_SECRET）
 COPY backend/pb_hooks      /pb/hooks
+
+# 5) 后端 migrations（spec v1.1 schema）
 COPY backend/pb_migrations /pb/migrations
 
-# 5) 启动脚本
+# 6) 启动脚本
 COPY start.sh /start.sh
 RUN chmod +x /start.sh
 
 # 数据持久化：Railway 不支持 Dockerfile 里的 VOLUME 指令。
 # 部署时在 Railway Dashboard → Service → Settings → Volumes 挂一个 Volume
-# 到容器内的 /pb_data（或任何你想用的路径）。start.sh 会自动读取
-# RAILWAY_VOLUME_MOUNT_PATH 或 PB_DATA 环境变量，把 PB 的 --dir 指向挂载点。
+# 到容器内的 /pb_data。start.sh 会自动读取 RAILWAY_VOLUME_MOUNT_PATH 或 PB_DATA
+# 环境变量，把 PB 的 --dir 指向挂载点。
 # 本地 docker run 时手动 -v $PWD/backend/pb_data:/pb_data 挂载。
 
 # 数据目录：start.sh 解析顺序为 RAILWAY_VOLUME_MOUNT_PATH > PB_DATA > /pb_data
@@ -109,12 +99,11 @@ RUN chmod +x /start.sh
 # （或设 RAILWAY_VOLUME_MOUNT_PATH 环境变量），否则容器重启会丢数据
 ENV PB_DATA=/pb_data
 
-# 端口：外部 PORT（Railway 注入，默认 3000）+ 内部 PB_PORT（不暴露）
+# 端口：Railway 注入（默认 3000）
 ENV PORT=3000
-ENV PB_PORT=8090
 EXPOSE ${PORT}
 
-# 健康检查：经 Node 代理到 PB /api/health
+# 健康检查：直接打 PB /api/health（同源）
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
   CMD wget --quiet --tries=1 --spider "http://127.0.0.1:${PORT}/api/health" || exit 1
 

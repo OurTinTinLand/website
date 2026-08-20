@@ -5,11 +5,12 @@
 //   2. __require("https://esm.sh/react@18")               ← 纯命名导入 { x }
 //   3. __toESM(__require("https://esm.sh/react-dom@18")) ← react-dom
 //   4. import_reactN.default 已在全局替换
-
+//
+// 输出路径：build.js 已经把 bundle 写到 backend/pb_public/dist/bundle.js
 const fs = require('fs');
 const path = require('path');
 
-const BUNDLE = path.join(__dirname, 'dist/bundle.js');
+const BUNDLE = path.join(__dirname, 'backend', 'pb_public', 'dist', 'bundle.js');
 let src = fs.readFileSync(BUNDLE, 'utf8');
 
 // 1) __toESM(...) 包裹的形式（default 导入混 named）
@@ -26,4 +27,4 @@ src = src.replace(/__require\("https:\/\/esm\.sh\/react-dom@18\/client"\)/g, 'wi
 src = src.replace(/import_react\d*\.default/g, 'window.React');
 
 fs.writeFileSync(BUNDLE, src);
-console.log('post-build OK: React globals wired');
+console.log('post-build OK: React globals wired → ' + BUNDLE);

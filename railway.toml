@@ -1,10 +1,10 @@
 # ============================================================
-# Railway 服务配置 · 统一镜像（前端 + PB，单 PORT 单 service）
+# Railway 服务配置 · 单进程镜像（pocketbase + pb_public）
 # ------------------------------------------------------------
 # 单 Service 部署：
-#   - Web + 后端 PB 共容器、单 PORT（Railway 注入）
+#   - pocketbase 自己 serve 静态文件（pb_public）+ API（/api/* + /_/*）
 #   - 1 个 service = 1 个最小实例
-#   - 内部走 localhost，零网络配置
+#   - 浏览器同源调用，零网络配置
 #
 # Volume：
 #   - Railway 不支持 Dockerfile 里的 VOLUME 指令
@@ -14,9 +14,6 @@
 #     RAILWAY_VOLUME_MOUNT_PATH > PB_DATA > /pb_data，所以这里改 mountPath 时
 #     也要改 PB_DATA（或让 RAILWAY_VOLUME_MOUNT_PATH 注入 = mountPath）
 #   - 想用其它路径（如 /data）？把下面 mountPath 改成 "/data"，start.sh 会自动跟随
-#
-# 切到分离部署：把 dockerfilePath 改成 "Dockerfile.frontend"，
-#   然后另起一个 service 用 Dockerfile.backend + railway.backend.toml
 # ============================================================
 
 [build]

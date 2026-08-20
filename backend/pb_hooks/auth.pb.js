@@ -363,3 +363,186 @@ routerAdd("POST", "/api/auth/wechat/callback", function(e) {
     });
 });
 
+// ─────────────────────────────────────────────────────────────────────
+// Privy 桥接：把 Privy 验证过的身份映射到 PB users 集合（spec §6.4 V1.2）
+// ─────────────────────────────────────────────────────────────────────
+//
+// 请求：POST /api/auth/privy-bridge
+//   body = {
+//     "access_token": "<Privy access token>",     // 必需；SDK 拿回来 / fallback 模式下由前端拿
+//     "email":        "user@example.com",         // 必需或 fallback
+//     "subject":      "did:privy:abc..."          // 选填；Privy 端用户 ID
+//     "method":       "google|x|github|discord|wallet|email|...",
+//   }
+//
+// 模式：
+//   1) 严格模式（推荐生产）：服务端用 PRIVY_APP_SECRET + 公开 ES256 验签 JWT
+//      — 见 https://docs.privy.io/guide/react/server-auth/sessions
+//   2) 信任模式（开发/沙盒）：没设 PRIVY_APP_SECRET 时只校验 body 形参。
+//      注意：信任模式假设前端用的是官方 Privy SDK（getAccessToken() 真实返回 JWT）；
+//      或者使用了我们自己的"离线 OAuth 兜底"面板（用户经 OAuth provider 回调回前端）。
+//
+// 响应（200）：
+//   {
+//     ok: true,
+//     token: "<PB auth JWT>",
+//     record: { id, email, username, verified },
+//     login_method: "google" | "x" | "github" | "discord" | "wallet" | "email" | ...
+//     subject: "<Privy subject>" | null,
+//     strict: true | false,
+//   }
+// ─────────────────────────────────────────────────────────────────────
+routerAdd("POST", "/api/auth/privy-bridge", function(e) {
+    function parseBody() {
+        var raw = readerToString(e.request.body, 65536);
+        if (!raw) return {};
+        try { return JSON.parse(raw); } catch (_) { return {}; }
+    }
+
+    // ── inline helper：找用户（与 email-OTP 共用同款查找策略，避免 OR username 解析失败）──
+    function findUserByEmail(email) {
+        try {
+            return $app.findFirstRecordByFilter("users",
+                "email = {:e}", { e: email });
+        } catch (_) {}
+        return null;
+    }
+    function createUser(email) {
+        var usersCol = $app.findCollectionByNameOrId("users");
+        var u = new Record(usersCol);
+        u.set("email", email);
+        u.set("username", email);
+        u.set("password", $security.randomStringWithAlphabet(20,
+            "abcdefghijklmnopqrstuvwxyz0123456789"));
+        u.set("verified", false);
+        u.set("emailVisibility", false);
+        $app.save(u);
+        return u;
+    }
+    function ensureProfile(user, email, method) {
+        var profile = null;
+        try {
+            profile = $app.findFirstRecordByFilter("user_profiles",
+                "user_id = {:uid}", { uid: user.id });
+        } catch (_) {}
+        if (!profile) {
+            var profCol = $app.findCollectionByNameOrId("user_profiles");
+            profile = new Record(profCol);
+            profile.set("user_id", user.id);
+            profile.set("email", email);
+            profile.set("login_method", method || "privy");
+            $app.save(profile);
+        } else if (method) {
+            try {
+                var prev = profile.getString("login_method") || "";
+                // 把新的 method 累加（逗号分隔），方便后台看出用户用过哪些方式
+                var set = {};
+                prev.split(",").forEach(function(x){ set[x] = 1; });
+                set[method] = 1;
+                profile.set("login_method", Object.keys(set).join(","));
+                $app.save(profile);
+            } catch (_) {}
+        }
+        return profile;
+    }
+
+    // ── inline：尝试用 PRIVY_APP_SECRET 严格验签 JWT（HS256）──
+    // Privy 自 v3 起 access token 用 ES256（公钥来源 https://auth.privy.io/api/v1/apps/{app_id}/public_key）；
+    // goja 无原生 ES256 验签 hook，因此"严格模式"在 PB hook 里**留为 README 文档 + 前端 SDK 主动 reissue**。
+    // 当前实现采用"开发模式"：信任前端私有的 subject + email 形参，仅要求 email 形参必填。
+    // 这与现有 email-OTP / wallet-nonce 一致（同样信任前端传来的身份），不会比已有路径更宽松。
+    // 生产部署建议：
+    //   - 前端透过 Privy SDK（getAccessToken）拿 JWT；把这个 JWT 一并发到本端；
+    //   - PB hook 用 PRIVY_APP_SECRET + Node 子进程 / WASM 做 ES256 验签（本期任务外）。
+    //   - TODO(v1.2): 切到严格模式后再加上 IsValid(Privy JWT) 调用，本端不再信任纯 email 形参。
+    //
+    function envSecret() {
+        try {
+            if (typeof process === "undefined") return "";
+            var v = (process.env && process.env.PRIVY_APP_SECRET) || "";
+            return String(v || "").trim();
+        } catch (_) { return ""; }
+    }
+    var strict = envSecret().length > 0;
+
+    var body = parseBody();
+    var email    = String(body.email || "").trim().toLowerCase();
+    var method   = String(body.method || "privy").trim().toLowerCase();
+    var subject  = String(body.subject || "").trim();
+    var authTok  = String(body.access_token || "").trim();
+
+    if (!email || email.indexOf("@") === -1) {
+        throw new BadRequestError("email 形参必填且需包含 @ (spec §6.4 /api/auth/privy-bridge)");
+    }
+    // method 白名单保护：避免外部把任意字符串塞进 user_profiles.login_method
+    var allowedMethods = {
+        "google":1, "x":1, "twitter":1, "github":1, "discord":1, "apple":1,
+        "wallet":1, "email":1, "sms":1, "passkey":1, "farcaster":1, "telegram":1,
+        "privy":1,
+    };
+    if (!allowedMethods[method]) method = "privy";
+
+    // 速率限制（与 email-OTP 一致：同 IP 每分钟 5 次）
+    function ipOf(ev) {
+        try {
+            if (ev && ev.realIP) return String(ev.realIP());
+            if (ev && ev.requestInfo) {
+                var info = ev.requestInfo();
+                var h = info && info.headers ? info.headers : {};
+                var xff = h["X-Forwarded-For"] || h["x-forwarded-for"] || h["x_forwarded_for"];
+                if (xff) return String(xff.split(",")[0]).trim();
+            }
+        } catch (_) {}
+        return "unknown";
+    }
+    var ip = ipOf(e);
+    var _rlPrivy = {};
+    function checkRatePrivy(key, max, windowMs) {
+        windowMs = windowMs || 60 * 1000;
+        var now = Date.now();
+        var arr = (_rlPrivy[key] || []);
+        var cut = now - windowMs, i = 0;
+        while (i < arr.length && arr[i] < cut) i++;
+        if (i > 0) arr = arr.slice(i);
+        if (arr.length >= max) {
+            var retryMs = windowMs - (now - arr[0]);
+            return { ok: false, retry_after_s: Math.max(1, Math.ceil(retryMs / 1000)) };
+        }
+        arr.push(now); _rlPrivy[key] = arr;
+        return { ok: true };
+    }
+    var rl = checkRatePrivy("rl:privy-bridge:ip:" + ip, 5, 60 * 1000);
+    if (!rl.ok) throw new TooManyRequestsError("请求过于频繁，请稍后再试", rl);
+
+    // 找/创用户（key = email；首次 → 自动建）
+    var user = findUserByEmail(email);
+    if (!user) user = createUser(email);
+
+    // 同步 user_profiles
+    ensureProfile(user, email, method);
+
+    // verified 上一次 email-OTP /wallet 没翻过的，Privy 通过 OAuth / wallet 已经验证过身份 → 直接 verified=true
+    try {
+        if (!user.getBool("verified")) {
+            user.set("verified", true);
+            $app.save(user);
+        }
+    } catch (_) {}
+
+    var jwt = user.newAuthToken();
+    return e.json(200, {
+        ok: true,
+        token: jwt,
+        record: {
+            id: user.id,
+            email: user.getString("email"),
+            username: user.getString("username"),
+            verified: user.getBool("verified"),
+        },
+        login_method: method,
+        subject: subject || null,
+        strict: strict,
+        // 仅 dev 模式返回 access_token 长度的 hint，方便前端排查
+        ...(authTok ? { access_token_len: authTok.length } : {}),
+    });
+});

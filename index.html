@@ -31,6 +31,19 @@
     占位为空时钩子什么也不注入（demo admin 自动 401）。
   -->
   <!--INJECT:PB_ADMIN_DEMO_SECRET-->
+
+  <!--
+    占位 2：start.sh 在容器启动前把这段注释替换成：
+      <script>
+        window.PRIVY_APP_ID="...";
+        window.PRIVY_CLIENT_ID="...";
+        window.PRIVY_LOGIN_METHODS="email,google,x,github,discord,wallet";
+      </script>
+    供前端 PrivyProvider 初始化使用。
+    没设置 PRIVY_APP_ID 时占位保留为注释 → 前端自动走"无 SDK 兜底"（OAuth 直连）。
+  -->
+  <!--INJECT:PRIVY_CONFIG-->
+
   <script src="dist/bundle.js"></script>
 </body>
 </html>

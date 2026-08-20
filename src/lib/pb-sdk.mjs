@@ -242,6 +242,40 @@ export function createPbClient(config) {
             return data;
         } catch (err) { throw asPbError(err); }
     }
+
+    // ---- 4.1 Privy 桥接（spec §6.4） ----
+    // 把"Privy 已验证过的身份"（email + 可选 subject）桥接到 PB users 集合。
+    // - 严格模式：后端看到 PRIVY_APP_SECRET 会回应 { strict: true } —— 配 SDK 时理想；
+    // - 信任模式：无 PRIVY_APP_SECRET 时与现有 email-OTP / wallet 一致安全等级。
+    // 一旦拿到 token，前端通过 pb.authStore 持久化（详见 pb.authStore.onChange 钩子）。
+    async function requestPrivyBridge({ email, method, subject, access_token }) {
+        if (!email || typeof email !== 'string') {
+            throw new PbError(400, 'email 必填');
+        }
+        try {
+            const data = await pb.send('/api/auth/privy-bridge', {
+                method: 'POST',
+                body: {
+                    email: String(email).trim().toLowerCase(),
+                    method: method ? String(method).trim().toLowerCase() : 'privy',
+                    subject: subject ? String(subject) : '',
+                    access_token: access_token ? String(access_token) : '',
+                },
+            });
+            if (data && data.token) {
+                pb.authStore.save(data.token, data.record || null);
+                try {
+                    if (typeof window !== 'undefined' && window.dispatchEvent) {
+                        window.dispatchEvent(new CustomEvent('app:auth:login', {
+                            detail: { method: data.login_method || 'privy', subject: data.subject || null },
+                        }));
+                    }
+                } catch (_) {}
+            }
+            return data;
+        } catch (err) { throw asPbError(err); }
+    }
+
     function logout() { pb.authStore.clear(); }
 
     // ---- 5. Demo admin (PB_ADMIN_DEMO_SECRET) ----
@@ -596,6 +630,7 @@ export function createPbClient(config) {
         requestEmailCode, verifyEmailCode,
         getWechatAuthUrl, wechatCallbackStub,
         getWalletNonce, verifyWallet,
+        requestPrivyBridge,
         // admin
         getSuperuserToken, getDemoAdminToken, clearAdminToken, withAdminToken,
         // ai

@@ -1,7 +1,7 @@
 {
   "name": "tintin-react",
-  "version": "1.0.0",
-  "description": "TinTinLand 官网 React 拆分 + esbuild 编译版。pb_public 单进程架构：esbuild 把 src/App.jsx 编到 backend/pb_public/dist/bundle.js，由 PocketBase --publicDir 直接 serve。",
+  "version": "1.1.0",
+  "description": "TinTinLand 官网 React 拆分 + esbuild 编译版。pb_public 单进程架构：esbuild 把 src/App.jsx 编到 backend/pb_public/dist/bundle.js，由 PocketBase --publicDir 直接 serve。v1.2 已集成 Privy 登录（spec §6.4，详见 PRIVY.md）。",
   "private": true,
   "scripts": {
     "build": "node build.js",
@@ -9,12 +9,19 @@
     "clean": "rm -rf backend/pb_public/dist backend/pb_public/index.html backend/pb_public/src backend/pb_public/assets-claude",
     "serve:pb": "bash backend/start.sh",
     "dev": "node build.js --watch & npm run serve:pb",
-    "serve:original": "node server-original.js"
+    "serve:original": "node server-original.js",
+    "verify:privy": "node -e \"require.resolve('@privy-io/react-auth');console.log('OK @privy-io/react-auth located')\""
   },
   "devDependencies": {
     "esbuild": "^0.28.1"
   },
+  "optionalDependencies": {
+    "@privy-io/react-auth": "^3.35.0"
+  },
   "engines": {
     "node": ">=18"
+  },
+  "dependencies": {
+    "pocketbase": "^0.28.0"
   }
 }

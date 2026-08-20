@@ -98,6 +98,36 @@ export function StoreProvider({ children }) {
     return data;
   }, []);
 
+  // Privy 桥接（spec §6.4）—— 接收后端 /api/auth/privy-bridge 返回值，写入 session
+  // payload 形如 { ok, token, record, login_method, subject, strict, email, method, ... }
+  const loginPrivyBridge = useCallback(async (payload) => {
+    if (!payload || !payload.token || !payload.record) {
+      throw new Error('Privy 桥接响应缺少 token/record');
+    }
+    const r = payload.record || {};
+    const method = payload.login_method || payload.method || 'privy';
+    const labelByMethod = {
+      google:'Google', x:'X (Twitter)', twitter:'Twitter', github:'GitHub', discord:'Discord',
+      apple:'Apple', wallet:'Web3 钱包', email:'邮箱验证码', sms:'短信', privy:'Privy',
+    };
+    const methodLabel = labelByMethod[method] || 'Privy';
+    setSession({
+      logged: true,
+      is_admin: false,
+      method: methodLabel,
+      email: r.email || (payload.email || ''),
+      user_id: r.id,
+      // 把 Privy subject（DID 或钱包地址） 留给 profile；
+      // wallet_login 的 subject 是 address；OAuth / email 则不写 wallet_address
+      profile: method === 'wallet'
+        ? { ...emptyProfile(), wallet_address: payload.subject || '' }
+        : emptyProfile(),
+      // 内部小标记：哪些 method 走过（方便后续风控 / 招聘板块判断）
+      privy: { subject: payload.subject || '', strict: !!payload.strict, method },
+    });
+    return payload;
+  }, []);
+
   const logout = useCallback(() => {
     PB.logout();
     setSession({ logged: false, is_admin: false, method: '', user_id: '', email: '', profile: emptyProfile() });
@@ -248,7 +278,7 @@ export function StoreProvider({ children }) {
     session, orders, intents, mySignups, orderSeq, reviewQueue, thTabReq,
     catalog,
     // auth
-    loginEmailOtp, loginGithubMock, loginWallet, logout, demoAdmin, saveProfile,
+    loginEmailOtp, loginGithubMock, loginWallet, loginPrivyBridge, logout, demoAdmin, saveProfile,
     // mutations
     addOrder, verifyOrder, resendAdvisorCode,
     addIntent, contactIntent, closeIntent, addSignup,

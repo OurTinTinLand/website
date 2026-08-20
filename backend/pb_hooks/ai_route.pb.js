@@ -9,18 +9,82 @@
 // 闭包变量访问不到，所以所有 helper 都必须 inline 在 routerAdd 回调里。
 //
 routerAdd("POST", "/api/ai-route", function(e) {
+    // ─── inline 速率限制 helper（goja 重新编译 handler，文件顶层不可见）───
+    function ipOf(ev) {
+        try {
+            if (ev && ev.realIP) return String(ev.realIP());
+            if (ev && ev.requestInfo) {
+                var info = ev.requestInfo();
+                var h = info && info.headers ? info.headers : {};
+                var xff = h["X-Forwarded-For"] || h["x-forwarded-for"] || h["x_forwarded_for"];
+                if (xff) return String(xff.split(",")[0]).trim();
+            }
+        } catch (_) {}
+        return "unknown";
+    }
+    var _rl_hits = {}, _rl_fails = {};
+    function checkRate(key, max, windowMs) {
+        windowMs = windowMs || 60 * 1000;
+        var now = Date.now();
+        var arr = (_rl_hits[key] || []);
+        var cut = now - windowMs, i = 0;
+        while (i < arr.length && arr[i] < cut) i++;
+        if (i > 0) arr = arr.slice(i);
+        if (arr.length >= max) {
+            var retryMs = windowMs - (now - arr[0]);
+            return { ok: false, retry_after_s: Math.max(1, Math.ceil(retryMs / 1000)) };
+        }
+        arr.push(now); _rl_hits[key] = arr;
+        return { ok: true };
+    }
+    function bumpFailure(key, max, lockMs) {
+        max = max || 5; lockMs = lockMs || 5 * 60 * 1000;
+        var now = Date.now();
+        var entry = _rl_fails[key] || { count: 0, locked_until: 0 };
+        if (entry.locked_until > now) {
+            return { locked: true, retry_after_s: Math.ceil((entry.locked_until - now) / 1000) };
+        }
+        entry.count += 1; entry.locked_until = 0;
+        if (entry.count >= max) {
+            entry.locked_until = now + lockMs; entry.count = 0;
+            return { locked: true, retry_after_s: Math.ceil(lockMs / 1000) };
+        }
+        _rl_fails[key] = entry;
+        return { ok: true, remaining: max - entry.count };
+    }
+    function resetFailures(key) { delete _rl_fails[key]; }
+
+    // 速率限制：每 IP 每分钟最多 60 次（关键词匹配是廉价的，但防滥用）
+    var aIp = ipOf(e);
+    var aRl = checkRate("rl:ai-route:ip:" + aIp, 60, 60 * 1000);
+    if (!aRl.ok) throw new TooManyRequestsError("请求过于频繁，请稍后再试", aRl);
+
+    // body 限 4KB（远小于之前 64KB，避免拿大 body 灌规则引擎）
+    var raw = "";
+    try { raw = readerToString(e.request.body, 4096); } catch (err) {
+        throw new BadRequestError("body 过大（>4KB）");
+    }
     var body = {};
     try {
-        var raw = readerToString(e.request.body, 65536);
-        if (raw && raw.length > 0) {
-            body = JSON.parse(raw);
-        }
+        if (raw && raw.length > 0) body = JSON.parse(raw);
     } catch (err) {
         console.log("[ai_route] body parse failed:", err);
     }
 
-    var message = (body.message == null ? "" : String(body.message)).toLowerCase();
-    var chips   = Array.isArray(body.chips) ? body.chips : [];
+    // message 限 256 字符；chips 限 8 个 × 64 字符
+    var rawMessage = body.message == null ? "" : String(body.message);
+    if (rawMessage.length > 256) {
+        throw new BadRequestError("message 过长（>256）");
+    }
+    var rawChips = Array.isArray(body.chips) ? body.chips : [];
+    var chips = [];
+    for (var ci = 0; ci < rawChips.length && ci < 8; ci++) {
+        var cv = String(rawChips[ci] || "");
+        if (cv.length > 64) cv = cv.slice(0, 64);
+        chips.push(cv);
+    }
+
+    var message = rawMessage.toLowerCase();
     var blob    = message + " " + chips.join(" ").toLowerCase();
 
     // intent 匹配规则表 —— 命中顺序即优先级
@@ -232,6 +296,6 @@ routerAdd("POST", "/api/ai-route", function(e) {
         summary: summary,
         cards: pickCards(cardKind, 2),
         cta: ctaForKind(cardKind),
-        echoed: { message: body.message == null ? "" : String(body.message), chips: chips }
+        echoed: { message: rawMessage.slice(0, 256), chips: chips }
     });
 });

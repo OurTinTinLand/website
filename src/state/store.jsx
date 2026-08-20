@@ -73,15 +73,18 @@ export function StoreProvider({ children }) {
     return data;
   }, []);
 
+  // GitHub OAuth UI 占位（spec §6.2 P1）：
+  // 本周未接 OAuth，不走后端、不写 PB。调用方传入什么就是什么。
+  // 安全注意：纯前端伪造 session，不要给"管理员"权限。生产必须换成真 OAuth 回调。
   const loginGithubMock = useCallback((email, ghLogin) => {
-    // GitHub OAuth V1.1 接入，本周 UI 占位（spec §6.2 P1）
+    if (!email || !ghLogin) return { ok: false, error: '缺少 email 或 ghLogin' };
     const id = 'u-gh-' + (ghLogin || email.split('@')[0]);
     setSession({
-      logged: true, is_admin: false, method: 'GitHub',
+      logged: true, is_admin: false, method: 'GitHub (mock)',
       email, user_id: id,
       profile: { ...emptyProfile(), github: 'github.com/' + ghLogin },
     });
-    return { ok: true };
+    return { ok: true, mock: true };
   }, []);
 
   const loginWallet = useCallback(async (address, signature, nonce) => {

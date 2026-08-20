@@ -55,7 +55,12 @@ RUN npm run build
 
 # ---- Stage 2: 运行时（alpine 单一基础）----
 FROM alpine:3.20
-ARG PB_VERSION=0.27.2
+# PocketBase 版本对齐：
+#   - backend/api.md / pb_hooks 中注释都明确写 "PocketBase v0.39 内置"（newAuthToken 等 API）。
+#   - 历史 Dockerfile 写 0.27.2，但 hooks 用 v0.39 行为 —— 在 v0.27 上会失败或不一致。
+#   - 这里锁到 v0.39.x 跟代码注释、api.md、本地 ./backend/pocketbase 二进制对齐。
+#   - 升级前请跑一次 migration 验证（pb_data 跨小版本可恢复；大版本需 dump/restore）。
+ARG PB_VERSION=0.39.11
 ARG TARGETARCH=amd64
 
 LABEL org.opencontainers.image.title="tintinland-all" \

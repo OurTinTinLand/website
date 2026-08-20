@@ -26,11 +26,17 @@ const PB_URL = (() => {
     // 默认：连本机 8090（dev 最常见）。生产环境应在 index.html 注入 window.PB_URL。
     return "http://127.0.0.1:8090";
 })();
-// 超管账号：优先读运行时注入（window.PB_ADMIN_EMAIL/PASSWORD，由 server.js / start.sh
-// 在 index.html 渲染时设置），找不到时回落到默认值（与 start.sh / Dockerfile 一致）。
-// 这样部署方改 PB_ADMIN_PASSWORD 环境变量后，前端会跟着更新，不用重新 build。
-const SUPERUSER_EMAIL = (typeof window !== "undefined" && window.PB_ADMIN_EMAIL) || "admin@tintin.land";
-const SUPERUSER_PASSWORD = (typeof window !== "undefined" && window.PB_ADMIN_PASSWORD) || "tintinland2026";
+// ─── 运营后台 token：不再在前端硬编码超管凭据 ───
+// 历史：曾经把 SUPERUSER_EMAIL/PASSWORD 直接写在前端，任何 DevTools 都能拿到。
+// 现在：前端只有 window.PB_ADMIN_DEMO_SECRET（由 server.js 从环境变量注入），
+// 凭这个 secret 调 /api/admin/superuser-token 拿后端现签的超管 token。
+// secret 错 / 没配：后端 401，整个 admin 流不可用。
+function getDemoSecret() {
+    if (typeof window !== "undefined" && window.PB_ADMIN_DEMO_SECRET) {
+        return String(window.PB_ADMIN_DEMO_SECRET);
+    }
+    return "";
+}
 
 export class PbError extends Error {
     constructor(status, message, data) {
@@ -84,10 +90,17 @@ export function clearUserSession() {
 }
 
 // ---- fetch wrapper ----
-async function req(method, path, body, token) {
+async function req(method, path, body, token, extraHeaders) {
     const headers = { "Content-Type": "application/json" };
     const tok = token || _userToken;
     if (tok) headers["Authorization"] = tok;
+    if (extraHeaders && typeof extraHeaders === "object") {
+        for (var _k in extraHeaders) {
+            if (Object.prototype.hasOwnProperty.call(extraHeaders, _k)) {
+                headers[_k] = extraHeaders[_k];
+            }
+        }
+    }
 
     let resp;
     try {
@@ -112,7 +125,7 @@ async function req(method, path, body, token) {
 
 export { PB_URL };
 
-// ---- superuser helpers（运营后台调试用，前端 demoAdmin 调用） ----
+// ---- superuser helpers（运营后台用：调后端 /api/admin/superuser-token 换短命 token） ----
 let _cachedSuperToken = null;
 let _cachedSuperExp = 0;
 
@@ -121,13 +134,24 @@ export async function getSuperuserToken(force) {
     if (!force && _cachedSuperToken && _cachedSuperExp > now + 60_000) {
         return _cachedSuperToken;
     }
-    const data = await req("POST", "/api/collections/_superusers/auth-with-password", {
-        identity: SUPERUSER_EMAIL,
-        password: SUPERUSER_PASSWORD,
-    });
+    const secret = getDemoSecret();
+    if (!secret) {
+        throw new PbError(0, "demo admin 未启用（缺少 PB_ADMIN_DEMO_SECRET）");
+    }
+    // 不再直连 PB superuser auth 端点 —— 走后端 /api/admin/superuser-token
+    // 凭 secret 让后端去签发超管 token，secret 不入 PB，泄露面更小。
+    const data = await req("POST", "/api/admin/superuser-token", { secret: secret });
+    if (!data || !data.token) {
+        throw new PbError(0, "未能签发 admin token");
+    }
     _cachedSuperToken = data.token;
-    _cachedSuperExp = now + 24 * 60 * 60 * 1000;
+    _cachedSuperExp = now + (data.exp_ms || 30 * 60 * 1000);
     return _cachedSuperToken;
+}
+
+export function clearSuperuserToken() {
+    _cachedSuperToken = null;
+    _cachedSuperExp = 0;
 }
 
 // ---- 1. AI 路由 ----
@@ -233,14 +257,16 @@ export const createOrder = (payload) =>
 
 export async function verifyOrder(id) {
     const t = await getSuperuserToken();
-    return req("PATCH", "/api/collections/orders/records/" + encodeURIComponent(id),
-        { status: "verified" }, t);
+    return req("POST", "/api/admin/proxy", {
+        collection: "orders", method: "PATCH", id: id,
+        payload: { status: "verified" },
+    }, t, { "X-Admin-Token": t });
 }
 
 export async function resendAdvisorCode(orderId) {
     const t = await getSuperuserToken();
     return req("POST", "/api/orders/resend-advisor-code",
-        { order_id: orderId }, t);
+        { order_id: orderId }, t, { "X-Admin-Token": t });
 }
 
 export const createIntent = (payload) =>
@@ -248,14 +274,18 @@ export const createIntent = (payload) =>
 
 export async function contactIntent(id) {
     const t = await getSuperuserToken();
-    return req("PATCH", "/api/collections/intents/records/" + encodeURIComponent(id),
-        { status: "contacted" }, t);
+    return req("POST", "/api/admin/proxy", {
+        collection: "intents", method: "PATCH", id: id,
+        payload: { status: "contacted" },
+    }, t, { "X-Admin-Token": t });
 }
 
 export async function closeIntent(id) {
     const t = await getSuperuserToken();
-    return req("PATCH", "/api/collections/intents/records/" + encodeURIComponent(id),
-        { status: "closed" }, t);
+    return req("POST", "/api/admin/proxy", {
+        collection: "intents", method: "PATCH", id: id,
+        payload: { status: "closed" },
+    }, t, { "X-Admin-Token": t });
 }
 
 export const createSignup = (payload) =>
@@ -263,8 +293,10 @@ export const createSignup = (payload) =>
 
 export async function reviewSubmission(id, reviewStatus, notes) {
     const t = await getSuperuserToken();
-    return req("PATCH", "/api/collections/signups/records/" + encodeURIComponent(id),
-        { review_status: reviewStatus, review_notes: notes || "" }, t);
+    return req("POST", "/api/admin/proxy", {
+        collection: "signups", method: "PATCH", id: id,
+        payload: { review_status: reviewStatus, review_notes: notes || "" },
+    }, t, { "X-Admin-Token": t });
 }
 
 export const createLead = (payload) =>
@@ -272,19 +304,26 @@ export const createLead = (payload) =>
 
 // ---- 4b. 运营后台：目录 CRUD（courses / events / hackathons / jobs / apps / providers） ----
 // 写操作需要 superuser token（运营后台；前端 demoAdmin 登录后调用）
-function withSuper(headers) { return headers; }
-
-async function adminCreate(name, payload) {
+// admin 写操作走 /api/admin/proxy：后端校验 X-Admin-Token 后才转发到 PB。
+// 这里把 token 走成 header（不是 body / query），避免落入 access log / referer。
+async function adminProxy(collection, method, id, payload, query) {
     const t = await getSuperuserToken();
-    return req("POST", "/api/collections/" + name + "/records", payload, t);
+    return req("POST", "/api/admin/proxy", {
+        collection: collection,
+        method: method,
+        id: id || "",
+        payload: payload || {},
+        query: query || {},
+    }, t, { "X-Admin-Token": t });
+}
+async function adminCreate(name, payload) {
+    return adminProxy(name, "POST", "", payload || {});
 }
 async function adminUpdate(name, id, payload) {
-    const t = await getSuperuserToken();
-    return req("PATCH", "/api/collections/" + name + "/records/" + encodeURIComponent(id), payload, t);
+    return adminProxy(name, "PATCH", id, payload || {});
 }
 async function adminDelete(name, id) {
-    const t = await getSuperuserToken();
-    return req("DELETE", "/api/collections/" + name + "/records/" + encodeURIComponent(id), undefined, t);
+    return adminProxy(name, "DELETE", id, {});
 }
 
 export const createCourse     = (p) => adminCreate("courses",     p);

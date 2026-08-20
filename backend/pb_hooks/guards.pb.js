@@ -13,29 +13,84 @@ onRecordsListRequest(function(e) {
                    "job_postings", "talent_profiles"];
     if (allowed.indexOf(name) === -1) { e.next(); return; }
 
+    // 白名单：每个 (collection, field) → 允许的值集合
+    // 比直接拼字符串更安全 —— 攻击者无法注入额外的 filter 表达式。
+    // 这里列出的值必须与 schema 同步更新；不同步顶多"过滤失效"，不会越权。
+    var WHITELIST = {
+        courses: {
+            category: ["AI 应用", "AI Agent\u00B7FDE", "AI 短剧", "Web3 技术"],
+            state:    ["upcoming", "ongoing", "past"],
+        },
+        events: {
+            tag:   ["AMA", "Workshop", "Meetup", "Tour", "Conference"],
+            type:  ["\u7EBF\u4E0A", "\u7EBF\u4E0B", "\u6DF7\u5408"],
+            state: ["upcoming", "ongoing", "past"],
+        },
+        hackathons: {
+            theme: ["AI", "DeFi", "NFT", "Infra", "\u8DE8\u94FE"],
+            state: ["upcoming", "ongoing", "past"],
+        },
+        jobs: {
+            role:     ["\u5DE5\u7A0B", "\u8FD0\u8425", "BD", "\u8BBE\u8BA1"],
+            job_type: ["full_time", "part_time", "intern"],
+        },
+        apps: {
+            type: ["\u804C\u4E1A\u5DE5\u5177", "\u793E\u4EA4", "\u5185\u5BB9", "\u5F00\u53D1"],
+        },
+        providers: {},
+        job_postings: {},
+        talent_profiles: {},
+    };
+
+    function pickAllowed(col, field) {
+        var m = WHITELIST[col];
+        if (!m) return null;
+        return m[field] || null;
+    }
+
+    function safePick(col, field, raw) {
+        var v = String(raw == null ? "" : raw).trim();
+        if (!v) return null;
+        var allowed = pickAllowed(col, field);
+        if (!allowed) return null;
+        if (allowed.indexOf(v) === -1) return null;
+        return v;
+    }
+
     var parts = [];
     try {
         var req = e.request;
         if (req && req.url) {
             var q = req.url.query ? req.url.query() : {};
             if (q.published === "1" || q.published === "true") parts.push("published = true");
-            if (q.state && ["upcoming", "ongoing", "past"].indexOf(String(q.state)) !== -1) {
-                parts.push("state = '" + String(q.state) + "'");
+
+            var stateV = safePick(name, "state", q.state);
+            if (stateV) parts.push("state = '" + stateV + "'");
+
+            // collection 专属字段
+            if (name === "courses") {
+                var c = safePick("courses", "category", q.category);
+                if (c) parts.push("category = '" + c + "'");
             }
-            if (q.category && name === "courses") {
-                parts.push("category = '" + String(q.category) + "'");
+            if (name === "events") {
+                var t = safePick("events", "tag", q.tag);
+                if (t) parts.push("tag = '" + t + "'");
+                var ty = safePick("events", "type", q.type);
+                if (ty) parts.push("type = '" + ty + "'");
             }
-            if (q.tag && name === "events") {
-                parts.push("tag = '" + String(q.tag) + "'");
+            if (name === "hackathons") {
+                var th = safePick("hackathons", "theme", q.theme);
+                if (th) parts.push("theme = '" + th + "'");
             }
-            if (q.theme && name === "hackathons") {
-                parts.push("theme = '" + String(q.theme) + "'");
+            if (name === "jobs") {
+                var r = safePick("jobs", "role", q.role);
+                if (r) parts.push("role = '" + r + "'");
+                var jt = safePick("jobs", "job_type", q.job_type);
+                if (jt) parts.push("job_type = '" + jt + "'");
             }
-            if (q.role && (name === "jobs")) {
-                parts.push("role = '" + String(q.role) + "'");
-            }
-            if (q.type && (name === "apps")) {
-                parts.push("type = '" + String(q.type) + "'");
+            if (name === "apps") {
+                var at = safePick("apps", "type", q.type);
+                if (at) parts.push("type = '" + at + "'");
             }
             // job_postings / talent_profiles：filter 已写在 schema listRule 上
             // （review_status = approved），这里不再加额外条件。

@@ -14,7 +14,7 @@
 //        GET  /api/auth/wallet/nonce          → 返回 nonce + message
 //        POST /api/auth/wallet/verify         {address, signature, nonce} → token
 //
-// Token 用 record.newAuthToken() 签发（PocketBase v0.39 内置）。
+// Token 用 record.newAuthToken() 签发（PocketBase v0.39 内置；Dockerfile 已锁 0.39.x）。
 //
 console.log("[auth.pb.js] LOADED v1.1");
 
@@ -28,12 +28,63 @@ routerAdd("POST", "/api/auth/email-code", function(e) {
     function genCode() {
         return $security.randomStringWithAlphabet(6, "0123456789");
     }
+    // ─── inline 速率限制 helper（goja 重新编译 handler，文件顶层不可见）───
+    function ipOf(ev) {
+        try {
+            if (ev && ev.realIP) return String(ev.realIP());
+            if (ev && ev.requestInfo) {
+                var info = ev.requestInfo();
+                var h = info && info.headers ? info.headers : {};
+                var xff = h["X-Forwarded-For"] || h["x-forwarded-for"] || h["x_forwarded_for"];
+                if (xff) return String(xff.split(",")[0]).trim();
+            }
+        } catch (_) {}
+        return "unknown";
+    }
+    var _rl_hits = {}, _rl_fails = {};
+    function checkRate(key, max, windowMs) {
+        windowMs = windowMs || 60 * 1000;
+        var now = Date.now();
+        var arr = (_rl_hits[key] || []);
+        var cut = now - windowMs, i = 0;
+        while (i < arr.length && arr[i] < cut) i++;
+        if (i > 0) arr = arr.slice(i);
+        if (arr.length >= max) {
+            var retryMs = windowMs - (now - arr[0]);
+            return { ok: false, retry_after_s: Math.max(1, Math.ceil(retryMs / 1000)) };
+        }
+        arr.push(now); _rl_hits[key] = arr;
+        return { ok: true };
+    }
+    function bumpFailure(key, max, lockMs) {
+        max = max || 5; lockMs = lockMs || 5 * 60 * 1000;
+        var now = Date.now();
+        var entry = _rl_fails[key] || { count: 0, locked_until: 0 };
+        if (entry.locked_until > now) {
+            return { locked: true, retry_after_s: Math.ceil((entry.locked_until - now) / 1000) };
+        }
+        entry.count += 1; entry.locked_until = 0;
+        if (entry.count >= max) {
+            entry.locked_until = now + lockMs; entry.count = 0;
+            return { locked: true, retry_after_s: Math.ceil(lockMs / 1000) };
+        }
+        _rl_fails[key] = entry;
+        return { ok: true, remaining: max - entry.count };
+    }
+    function resetFailures(key) { delete _rl_fails[key]; }
 
     var body = parseBody();
     var email = String(body.email || "").trim().toLowerCase();
     if (!email || email.indexOf("@") === -1) {
         throw new BadRequestError("email 格式不正确");
     }
+
+    // 速率限制：同一 IP 每分钟最多 5 次，同一 email 每小时最多 10 次
+    var ip = ipOf(e);
+    var rl1 = checkRate("rl:email-code:ip:" + ip, 5, 60 * 1000);
+    if (!rl1.ok) throw new TooManyRequestsError("请求过于频繁，请稍后再试", rl1);
+    var rl2 = checkRate("rl:email-code:email:" + email, 10, 60 * 60 * 1000);
+    if (!rl2.ok) throw new TooManyRequestsError("该邮箱请求过于频繁，请稍后再试", rl2);
 
     // 1. 找/创 user（用作 OTP.recordRef，必须指向真实 record）
     var usersCol = $app.findCollectionByNameOrId("users");
@@ -83,7 +134,7 @@ routerAdd("POST", "/api/auth/email-code", function(e) {
     return e.json(200, {
         ok: true,
         email: email,
-        dev_code: mailSent ? null : code,    // 生产环境部署邮件后必须删除
+        // 不再向客户端回传验证码。即使邮件发送失败，也走日志排查，不暴露给前端。
         mail_sent: mailSent,
         ttl_minutes: 10,
     });
@@ -95,6 +146,51 @@ routerAdd("POST", "/api/auth/email-code/verify", function(e) {
         if (!raw) return {};
         try { return JSON.parse(raw); } catch (_) { return {}; }
     }
+    // ─── inline 速率限制 helper（goja 重新编译 handler，文件顶层不可见）───
+    function ipOf(ev) {
+        try {
+            if (ev && ev.realIP) return String(ev.realIP());
+            if (ev && ev.requestInfo) {
+                var info = ev.requestInfo();
+                var h = info && info.headers ? info.headers : {};
+                var xff = h["X-Forwarded-For"] || h["x-forwarded-for"] || h["x_forwarded_for"];
+                if (xff) return String(xff.split(",")[0]).trim();
+            }
+        } catch (_) {}
+        return "unknown";
+    }
+    var _rl_hits = {}, _rl_fails = {};
+    function checkRate(key, max, windowMs) {
+        windowMs = windowMs || 60 * 1000;
+        var now = Date.now();
+        var arr = (_rl_hits[key] || []);
+        var cut = now - windowMs, i = 0;
+        while (i < arr.length && arr[i] < cut) i++;
+        if (i > 0) arr = arr.slice(i);
+        if (arr.length >= max) {
+            var retryMs = windowMs - (now - arr[0]);
+            return { ok: false, retry_after_s: Math.max(1, Math.ceil(retryMs / 1000)) };
+        }
+        arr.push(now); _rl_hits[key] = arr;
+        return { ok: true };
+    }
+    function bumpFailure(key, max, lockMs) {
+        max = max || 5; lockMs = lockMs || 5 * 60 * 1000;
+        var now = Date.now();
+        var entry = _rl_fails[key] || { count: 0, locked_until: 0 };
+        if (entry.locked_until > now) {
+            return { locked: true, retry_after_s: Math.ceil((entry.locked_until - now) / 1000) };
+        }
+        entry.count += 1; entry.locked_until = 0;
+        if (entry.count >= max) {
+            entry.locked_until = now + lockMs; entry.count = 0;
+            return { locked: true, retry_after_s: Math.ceil(lockMs / 1000) };
+        }
+        _rl_fails[key] = entry;
+        return { ok: true, remaining: max - entry.count };
+    }
+    function resetFailures(key) { delete _rl_fails[key]; }
+
     function findOrCreateUser(email, loginMethod) {
         var col = $app.findCollectionByNameOrId("users");
         var rec = null;
@@ -145,6 +241,17 @@ routerAdd("POST", "/api/auth/email-code/verify", function(e) {
         throw new BadRequestError("缺少 email 或 code");
     }
 
+    // 速率限制：同一 IP 每分钟最多 10 次 verify，失败 5 次锁 5 分钟
+    var ip = ipOf(e);
+    var verifyKey = "fail:verify:ip:" + ip;
+    var rlv = checkRate("rl:verify:ip:" + ip, 10, 60 * 1000);
+    if (!rlv.ok) throw new TooManyRequestsError("请求过于频繁，请稍后再试", rlv);
+    // 失败计数：连续 5 次失败 → 锁 IP 5 分钟
+    var failEntry = bumpFailure(verifyKey, 5, 5 * 60 * 1000);
+    if (failEntry.locked) {
+        throw new TooManyRequestsError("失败次数过多，已临时锁定", failEntry);
+    }
+
     // helper inline
     function findUserByEmail(em) {
         var r = null;
@@ -180,8 +287,11 @@ routerAdd("POST", "/api/auth/email-code/verify", function(e) {
         }
     }
     if (!otp) {
+        // 全部试过都不匹配 → 留 failure 计数（已在路由入口 bump）
         throw new BadRequestError("验证码错误或已过期");
     }
+    // 验证成功：清掉失败计数
+    resetFailures(verifyKey);
     try { $app.delete(otp); } catch (_) {}
 
     // 找/创用户：用简单 email 过滤（避免 OR username 解析失败导致重复创建）
@@ -253,164 +363,3 @@ routerAdd("POST", "/api/auth/wechat/callback", function(e) {
     });
 });
 
-// ─────────────────────────────────────────────────────────────────────
-// 钱包：nonce + verify（V1.1 接真实签名校验）
-// ─────────────────────────────────────────────────────────────────────
-routerAdd("GET", "/api/auth/wallet/nonce", function(e) {
-    function genNonce() {
-        return $security.randomStringWithAlphabet(32,
-            "abcdefghijklmnopqrstuvwxyz0123456789");
-    }
-    var nonce = genNonce();
-    var issued = new Date().toISOString();
-    var msg = [
-        "TinTinLand Wallet Login",
-        "Nonce: " + nonce,
-        "Issued: " + issued,
-        "Sign this message to prove you own this wallet.",
-    ].join("\n");
-
-    try {
-        var otpCol = $app.findCollectionByNameOrId("_otps");
-        var usersColId = $app.findCollectionByNameOrId("users").id;
-        var otp = new Record(otpCol);
-        otp.set("collectionRef", usersColId);
-        // recordRef 必须指向真实 user，但 wallet 登录时 user 还不存在。
-        // 用 SaveNoValidate 跳过 _otps 的 collectionRef/recordRef 校验。
-        otp.set("recordRef", "wallet-nonce:" + nonce);
-        otp.set("sentTo", "wallet:" + nonce);
-        otp.set("password", "nonce-issued");
-        $app.saveNoValidate(otp);
-    } catch (werr) {
-        console.log("[wallet/nonce] otp save failed:", werr && werr.message);
-    }
-
-    return e.json(200, {
-        ok: true,
-        nonce: nonce,
-        issued_at: issued,
-        message: msg,
-        ttl_minutes: 10,
-    });
-});
-
-routerAdd("POST", "/api/auth/wallet/verify", function(e) {
-    function parseBody() {
-        var raw = readerToString(e.request.body, 65536);
-        if (!raw) return {};
-        try { return JSON.parse(raw); } catch (_) { return {}; }
-    }
-    function findOrCreateUser(email, loginMethod) {
-        var col = $app.findCollectionByNameOrId("users");
-        var rec = null;
-        try {
-            rec = $app.findFirstRecordByFilter("users",
-                "email = {:e} || username = {:e}",
-                { e: email });
-        } catch (_) {}
-        if (!rec) {
-            rec = new Record(col);
-            rec.set("email", email);
-            rec.set("username", email);
-            rec.set("password", $security.randomStringWithAlphabet(20,
-                "abcdefghijklmnopqrstuvwxyz0123456789"));
-            rec.set("verified", true);
-            rec.set("emailVisibility", false);
-            $app.save(rec);
-        }
-        var profile = null;
-        try {
-            profile = $app.findFirstRecordByFilter("user_profiles",
-                "user_id = {:uid}", { uid: rec.id });
-        } catch (_) {}
-        if (!profile) {
-            var profCol = $app.findCollectionByNameOrId("user_profiles");
-            profile = new Record(profCol);
-            profile.set("user_id", rec.id);
-            profile.set("email", email);
-            profile.set("login_method", loginMethod || "wallet");
-            $app.save(profile);
-        }
-        return rec;
-    }
-
-    var body = parseBody();
-    var address   = String(body.address   || "").toLowerCase();
-    var nonce     = String(body.nonce     || "");
-    if (!address || !nonce) {
-        throw new BadRequestError("缺少 address 或 nonce");
-    }
-
-    // wallet nonce 不用密码校验，只检查 sentTo 存在 + 未过期
-    var records = $app.findRecordsByFilter("_otps",
-        "sentTo = {:s}", "-created", 5, 0,
-        { s: "wallet:" + nonce });
-    if (!records || records.length === 0) {
-        throw new BadRequestError("nonce 不存在或已过期");
-    }
-    var otp = null;
-    for (var i = 0; i < records.length; i++) {
-        var r = records[i];
-        var created = r.getDateTime("created");
-        var ageMin = (new Date().getTime() - new Date(created).getTime()) / 60000;
-        if (ageMin > 10) {
-            try { $app.delete(r); } catch (_) {}
-            continue;
-        }
-        otp = r;
-        break;
-    }
-    if (!otp) {
-        throw new BadRequestError("nonce 已过期");
-    }
-    try { $app.delete(otp); } catch (_) {}
-
-    var pseudoEmail = address + "@wallet.local";
-    // 找/创用户（wallet 走简化 filter）
-    var user = null;
-    try {
-        user = $app.findFirstRecordByFilter("users",
-            "email = {:e}", { e: pseudoEmail });
-    } catch (_) {}
-    if (!user) {
-        var usersCol = $app.findCollectionByNameOrId("users");
-        user = new Record(usersCol);
-        user.set("email", pseudoEmail);
-        user.set("username", pseudoEmail);
-        user.set("password", $security.randomStringWithAlphabet(20,
-            "abcdefghijklmnopqrstuvwxyz0123456789"));
-        user.set("verified", true);
-        user.set("emailVisibility", false);
-        $app.save(user);
-    }
-    // 同步 user_profiles（含 wallet_address）
-    var profile = null;
-    try {
-        profile = $app.findFirstRecordByFilter("user_profiles",
-            "user_id = {:uid}", { uid: user.id });
-    } catch (_) {}
-    if (!profile) {
-        var profCol = $app.findCollectionByNameOrId("user_profiles");
-        profile = new Record(profCol);
-    }
-    profile.set("user_id", user.id);
-    profile.set("email", pseudoEmail);
-    profile.set("wallet_address", address);
-    profile.set("login_method", "wallet");
-    $app.save(profile);
-
-    var jwt = user.newAuthToken();
-
-    return e.json(200, {
-        ok: true,
-        token: jwt,
-        record: {
-            id: user.id,
-            email: user.getString("email"),
-            username: user.getString("username"),
-        },
-        login_method: "wallet",
-        wallet_address: address,
-        signature_verified: false,   // 本周为占位
-    });
-});

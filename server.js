@@ -9,10 +9,16 @@ const ROOT = __dirname;
 const PORT = process.env.PORT ? Number(process.env.PORT) : 8123;
 const PB_URL = process.env.PB_URL || '';     // e.g. http://127.0.0.1:8090
 const PROXY_PATHS = ['/api/', '/_/'];          // 转发白名单前缀
-// 超管账号（与 start.sh / pb-client.js 默认值一致；start.sh 会 export 进来）。
-// 用 window 注入给前端，避免前端硬编码密码与服务端不同步导致 401。
+// 超管账号（与 start.sh 默认值一致；start.sh 会 export 进来）。
+// 仍然注入给前端，但用途严格限定：仅 server.js 与 start.sh bootstrap 超管时使用。
+// 前端不再直接用它们登录（见 admin_proxy.pb.js 改成走 secret 模式）。
 const PB_ADMIN_EMAIL = process.env.PB_ADMIN_EMAIL || 'admin@tintin.land';
 const PB_ADMIN_PASSWORD = process.env.PB_ADMIN_PASSWORD || 'tintinland2026';
+
+// Demo admin 入口 secret：替换历史方案中"前端硬编码 superuser 密码"的漏洞。
+// - 生产环境必须显式设置 PB_ADMIN_DEMO_SECRET；不设则 demoAdmin() 直接失败。
+// - 仅用于"运营后台 demo 模式" —— 真实生产请关闭 demoAdmin，给运营人员走 PB 自带登录。
+const PB_ADMIN_DEMO_SECRET = process.env.PB_ADMIN_DEMO_SECRET || '';
 
 const MIME = {
   '.html': 'text/html; charset=utf-8',
@@ -32,14 +38,42 @@ const MIME = {
 };
 
 // 反向代理：转发到 PB_URL（含 WebSocket upgrade）
+// 修复 #14：原版透传所有 header 导致 PB 端 host 校验、cookie domain 混乱。
+// 这里显式覆盖：
+//   - Host              改成 PB 后端自己的 host（PB 用 trustedProxy 检查后决定
+//                        拿哪个 host 当 origin，否则会跟外部域名不一致）
+//   - X-Forwarded-For   追加（不要覆盖）真实客户端 IP
+//   - X-Forwarded-Proto 透传原 scheme（https / http）
+//   - X-Forwarded-Host  透传外部域名（PB 用来判断 CORS / cookie domain）
+//   - 其他 hop-by-hop 头（connection / upgrade）由 http.request 自动处理
 function proxyToPB(req, res) {
   const u = new URL(PB_URL);
+  // 复制一份原始 header，避免污染 req.headers
+  const fwdHeaders = Object.assign({}, req.headers);
+  // 覆盖 Host：让 PB 看到的是它自己的 host
+  fwdHeaders.host = u.hostname + (u.port ? ':' + u.port : '');
+  // X-Forwarded-For：追加（逗号分隔）
+  const clientIp = (req.socket && req.socket.remoteAddress) || '';
+  const xffOld = fwdHeaders['x-forwarded-for'];
+  fwdHeaders['x-forwarded-for'] = xffOld ? (xffOld + ', ' + clientIp) : clientIp;
+  // X-Forwarded-Proto / Host 透传外部值
+  const xfp = (fwdHeaders['x-forwarded-proto'] || (req.socket && req.socket.encrypted ? 'https' : 'http'));
+  fwdHeaders['x-forwarded-proto'] = xfp;
+  const xfh = req.headers['host'];
+  if (xfh) fwdHeaders['x-forwarded-host'] = xfh;
+  // Content-Length 留给 http 自动算（不要从 req.headers 抄，可能已被消费）
+  delete fwdHeaders['content-length'];
+  // hop-by-hop headers 由 Node http 处理
+  delete fwdHeaders['connection'];
+  delete fwdHeaders['keep-alive'];
+  delete fwdHeaders['transfer-encoding'];
+
   const opts = {
     hostname: u.hostname,
     port: u.port || (u.protocol === 'https:' ? 443 : 80),
     path: req.url,
     method: req.method,
-    headers: req.headers,
+    headers: fwdHeaders,
   };
   const proxyReq = http.request(opts);
   proxyReq.on('response', (proxyRes) => {
@@ -92,8 +126,8 @@ const server = http.createServer((req, res) => {
         }
         const lines = [];
         if (PB_URL) lines.push('window.PB_URL="' + PB_URL.replace(/"/g, '\"') + '";');
-        lines.push('window.PB_ADMIN_EMAIL="' + PB_ADMIN_EMAIL.replace(/"/g, '\"') + '";');
-        lines.push('window.PB_ADMIN_PASSWORD="' + PB_ADMIN_PASSWORD.replace(/"/g, '\"') + '";');
+        // 注入 demo admin secret。前端用它去换 admin token；不再注入超管邮箱密码。
+        if (PB_ADMIN_DEMO_SECRET) lines.push('window.PB_ADMIN_DEMO_SECRET="' + PB_ADMIN_DEMO_SECRET.replace(/"/g, '\"') + '";');
         const inject = '<script>' + lines.join('') + '</script>';
         // 插在原有 PB_URL 注入块之后、bundle.js 之前；
         // 浏览器按顺序执行：原内联块 → 超管账号 → bundle.js 加载 pb-client.js

@@ -85,6 +85,14 @@ onRecordCreateRequest(function(e) {
 // 前台脱敏：jobs / job_postings / talent_profiles 的 contact 字段
 //   非 superuser 拿到记录时，把 contact 抹掉
 //   onRecordEnrich 在 list / view / 各 enrich 阶段都触发
+//
+// 重要：onRecordEnrich 只影响返回给客户端的 payload，不改 SQLite 里的原始值。
+// 也就是说 DB 里的 contact 还是运营在后台能看的有原始联系信息；前台/匿名
+// 列表拉到的都被抹掉。schema 里 viewRule / listRule 通常也会收紧，这里是
+// 双层保险（即使 listRule 失效，enrich 也会再抹一次）。
+//
+// 历史问题反馈："enrich 把 contact 写回 DB"是误判，PB 的 enrich 是
+// response-only 的。这里把语义写在注释里，避免下次又被人误解。
 // ─────────────────────────────────────────────────────────────────────
 onRecordEnrich(function(e) {
     try {

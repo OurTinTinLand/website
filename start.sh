@@ -21,11 +21,14 @@ PORT="${PORT:-3000}"
 # 不会影响 /api/* 由 server.js 反代（同源代理不算跨域）。
 PB_ORIGINS="${PB_ORIGINS:-*}"
 
-# 超管账号：默认值与 src/utils/pb-client.js 里的硬编码常量一致。
-# 任何改了 PB_ADMIN_PASSWORD 的部署，pb-client.js 会通过 window.PB_ADMIN_PASSWORD
-# 拿到新值（见 index.html 注入逻辑），保持前后端同步。
+# 超管账号：默认值与 Dockerfile / start.sh 一致。
+# server.js / admin_proxy.pb.js 都不再把这些值透给前端（避免 DevTools 拿到明文）。
 PB_ADMIN_EMAIL="${PB_ADMIN_EMAIL:-admin@tintin.land}"
 PB_ADMIN_PASSWORD="${PB_ADMIN_PASSWORD:-tintinland2026}"
+
+# Demo admin 入口 secret：替换历史"前端硬编码 superuser 密码"方案。
+# 生产环境必须显式设一个长随机串；不设则 demoAdmin() 直接 401。
+PB_ADMIN_DEMO_SECRET="${PB_ADMIN_DEMO_SECRET:-}"
 
 # 数据目录解析：
 #   - 显式设 RAILWAY_VOLUME_MOUNT_PATH（Railway 注入的 volume 挂载点）：
@@ -83,4 +86,5 @@ export PB_URL="http://127.0.0.1:${PB_PORT}"
 # 与 PB 服务端不同步而 401。
 export PB_ADMIN_EMAIL
 export PB_ADMIN_PASSWORD
+export PB_ADMIN_DEMO_SECRET
 exec node server.js

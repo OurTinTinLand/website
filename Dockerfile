@@ -36,7 +36,7 @@ WORKDIR /app
 
 # 先拷贝 manifest，最大化 Docker 层缓存
 COPY package.json package-lock.json* ./
-RUN npm ci --no-audit --no-fund
+RUN npm i --no-audit --no-fund
 
 # 再拷贝源码（build.js 会把产物落到 backend/pb_public/）
 COPY . .

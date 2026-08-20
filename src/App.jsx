@@ -1,5 +1,5 @@
 // 顶层装配
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { StoreProvider, ToastProvider, useStore } from './state/store';
 import { Router, useRoute } from './utils/router';
 
@@ -33,7 +33,8 @@ import { PayModal } from './modals/PayModal';
 
 function Shell() {
   const { page, detailId, go } = useRoute();
-  const { session, demoAdmin, catalog } = useStore();
+  const { session, canAccessAdmin, catalog } = useStore();
+  const toast = useToast();
 
   const [loginOpen,  setLoginOpen]  = useState(false);
   const [loginAfter, setLoginAfter] = useState(null);
@@ -119,7 +120,10 @@ function Shell() {
       <PayModal
         course={payCourseId ? courses.find((c) => c.id === payCourseId) : null}
         onClose={closePay}
-        onAdminJump={() => { demoAdmin(); go('admin'); }}
+        onAdminJump={() => {
+          if (canAccessAdmin(session)) go('admin');
+          else { toast.show('请用运营账号登录后再试 · 下次点击会打开 Privy 登录'); openLogin(() => go('admin')); }
+        }}
       />
     </>
   );

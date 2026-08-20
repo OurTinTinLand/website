@@ -3,6 +3,18 @@ import React, { useState, useEffect } from 'react';
 import { useRoute } from '../utils/router';
 import { useStore, useToast } from '../state/store';
 
+// v1.2 角色展示（spec §14.6）
+// ROLE_SHORT 用在 Nav 上（窄按钮内显示全称太长）
+const ROLE_SHORT = {
+  super_admin: '超管',
+  content_ops: '运营',
+  reviewer: '审核',
+  customer_support: '客服',
+  member: '用户',
+};
+
+
+
 const NAV = [
   ['home','首页'], ['courses','课程'], ['events','活动'], ['hackathons','黑客松'],
   ['jobs','招聘'], ['tokenhub','Token Hub'], ['apps','应用工具'],
@@ -11,7 +23,7 @@ const NAV = [
 
 export function TopNav({ openLogin }) {
   const { page, go } = useRoute();
-  const { session } = useStore();
+  const { session, canAccessAdmin } = useStore();
   const toast = useToast();
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -42,7 +54,9 @@ export function TopNav({ openLogin }) {
           <button className="btn btn-line btn-sm lang" onClick={() => toast.show('i18n 留到 V1.1')}>EN</button>
           <button className="btn btn-line btn-sm" id="navAdmin" onClick={() => go('admin')}>运营后台</button>
           <button className="btn btn-fill btn-sm" id="navAuth" onClick={onAuthClick}>
-            {session.logged ? (session.is_admin ? '我的 · 运营' : '我的') : '登录'}
+            {session.logged
+              ? (canAccessAdmin(session) ? `我的 · ${ROLE_SHORT[session.role] || '运营'}` : '我的')
+              : '登录'}
           </button>
           <button className="navtoggle" onClick={() => setMenuOpen((v) => !v)} aria-label={menuOpen ? '关闭菜单' : '打开菜单'}>
             {menuOpen ? (

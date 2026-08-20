@@ -431,6 +431,9 @@ routerAdd("POST", "/api/auth/privy-bridge", function(e) {
             profile.set("user_id", user.id);
             profile.set("email", email);
             profile.set("login_method", method || "privy");
+            // v1.2 · role 默认 member；运营角色由后台手动改（spec §14.6）
+            // 字段不存在（旧 PB 上跑）→ try/catch 静默忽略；migration 会后补
+            try { profile.set("role", "member"); } catch (_) {}
             $app.save(profile);
         } else if (method) {
             try {
@@ -444,6 +447,22 @@ routerAdd("POST", "/api/auth/privy-bridge", function(e) {
             } catch (_) {}
         }
         return profile;
+    }
+
+    // v1.2 · 探测当前用户是不是 PB _superusers（spec §14.6 super_admin 来源）
+    // 失败 → 静默回退到 profile.role，profile 没 role 默认 member
+    function resolveRole(profile, email) {
+        try {
+            var su = $app.findFirstRecordByFilter("_superusers",
+                "email = {:e}", { e: email });
+            if (su) return "super_admin";
+        } catch (_) {}
+        try {
+            var r = String(profile.getString("role") || "member");
+            return r === "" ? "member" : r;
+        } catch (_) {
+            return "member";
+        }
     }
 
     // ── inline：尝试用 PRIVY_APP_SECRET 严格验签 JWT（HS256）──
@@ -518,8 +537,8 @@ routerAdd("POST", "/api/auth/privy-bridge", function(e) {
     var user = findUserByEmail(email);
     if (!user) user = createUser(email);
 
-    // 同步 user_profiles
-    ensureProfile(user, email, method);
+    // 同步 user_profiles（拿到返回值 → 给 resolveRole 用）
+    var profile = ensureProfile(user, email, method);
 
     // verified 上一次 email-OTP /wallet 没翻过的，Privy 通过 OAuth / wallet 已经验证过身份 → 直接 verified=true
     try {
@@ -530,6 +549,18 @@ routerAdd("POST", "/api/auth/privy-bridge", function(e) {
     } catch (_) {}
 
     var jwt = user.newAuthToken();
+
+    // v1.2 · role 解析（spec §14.6）：PB _superusers → super_admin，
+    // 其次 user_profiles.role，最后兜底 member
+    var role = resolveRole(profile, email);
+    // 同步回 profile（如 role 因升级变更或后补）
+    try {
+        if (profile && String(profile.getString("role") || "") !== role) {
+            profile.set("role", role);
+            $app.save(profile);
+        }
+    } catch (_) {}
+
     return e.json(200, {
         ok: true,
         token: jwt,
@@ -542,6 +573,7 @@ routerAdd("POST", "/api/auth/privy-bridge", function(e) {
         login_method: method,
         subject: subject || null,
         strict: strict,
+        role: role,
         // 仅 dev 模式返回 access_token 长度的 hint，方便前端排查
         ...(authTok ? { access_token_len: authTok.length } : {}),
     });

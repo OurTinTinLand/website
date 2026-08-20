@@ -4,7 +4,7 @@
 //   14.3 首页运营位管理
 //   14.4 报名/投递审核中心
 //   14.5 订单与支付核销（含手动补发）
-//   14.6 用户与权限管理（V1.1 暂用 is_admin）
+//   14.6 用户与权限管理（v1.2+ 走 user_profiles.role，4 角色 + super_admin 5 档）
 //   14.7 系统通知文案配置（占位）
 //   本周目标：模块一（内容管理）+ 模块四（订单核销）必须完整；其余做基础版
 import React, { useState, useMemo, useEffect } from 'react';
@@ -26,11 +26,10 @@ const TABS = [
 ];
 
 export function AdminPage() {
-  const { session, demoAdmin } = useStore();
+  const { session, canAccessAdmin, canSeeAdminTab } = useStore();
   const toast = useToast();
   const [tab, setTab] = useState('content');
-
-  const isOps = session.logged && session.is_admin;
+  const role = session.role || 'member';
 
   return (
     <section className="page page-section">
@@ -40,33 +39,45 @@ export function AdminPage() {
           <p className="lead">按运营工作流划分 6 个模块 · 本周完成 ① 内容管理 + ④ 订单核销，其余基础版。</p>
         </div>
 
+        {/* 角色对应的 Tab（spec §14.6 角色 → Tab 映射）*/}
         <div className="subs scroll-x">
-          {TABS.map(([k, label]) => (
+          {TABS.filter(([k]) => canSeeAdminTab(k, session)).map(([k, label]) => (
             <button key={k} className={'sub' + (tab === k ? ' on' : '')} onClick={() => setTab(k)}>{label}</button>
           ))}
         </div>
 
-        {!isOps && <Gate onDemo={() => { demoAdmin(); toast.show('已切换为运营身份（仅原型演示）'); }} />}
+        <p className="xs" style={{ color:'var(--ink-3)', marginBottom: 16 }}>
+          当前身份：<code>{role}</code> · 邮箱 {session.email || '—'}
+          {role === 'super_admin' && ' · PB _superusers 自动识别'}
+        </p>
 
-        {isOps && tab === 'content'   && <ContentCenter />}
-        {isOps && tab === 'homeops'   && <HomeOps />}
-        {isOps && tab === 'review'    && <ReviewCenter />}
-        {isOps && tab === 'orders'    && <OrdersOps />}
-        {isOps && tab === 'users'     && <UserOps />}
-        {isOps && tab === 'notify'    && <NotifyConfig />}
+        {!canAccessAdmin(session) && <LoginPrompt onLogin={() => { window.dispatchEvent(new CustomEvent('app:openLogin', { detail: { after: () => location.reload() } })); }} />}
+
+        {canAccessAdmin(session) && tab === 'content'   && <ContentCenter />}
+        {canAccessAdmin(session) && tab === 'homeops'   && <HomeOps />}
+        {canAccessAdmin(session) && tab === 'review'    && <ReviewCenter />}
+        {canAccessAdmin(session) && tab === 'orders'    && <OrdersOps />}
+        {canAccessAdmin(session) && tab === 'users'     && <UserOps />}
+        {canAccessAdmin(session) && tab === 'notify'    && <NotifyConfig />}
       </div>
     </section>
   );
 }
 
-function Gate({ onDemo }) {
+function LoginPrompt({ onLogin }) {
   return (
     <div className="empty">
       <img src={dogUrl('dog-harness')} alt="" />
-      运营后台需要管理员权限。<br />
-      生产环境按 PocketBase 角色规则鉴权，前端路由同时拦截。
+      运营后台仅对运营角色开放。
+      <br />
+      请用 <b>Privy</b> 登录并在 Privy Dashboard 里把账号绑定到运营邮箱；
+      角色由后台（user_profiles.role 字段）指定。
       <br /><br />
-      <button className="btn btn-fill" onClick={onDemo}>（演示）以运营身份进入</button>
+      <button className="btn btn-fill" onClick={onLogin}>用 Privy 登录</button>
+      <br /><br />
+      <p className="xs" style={{ color: 'var(--ink-3)' }}>
+        角色说明：超级管理员（全部权限） · 内容运营（①+②） · 审核员（③+⑤） · 客服（④+⑤）· 注册用户（个人中心）
+      </p>
     </div>
   );
 }
@@ -630,7 +641,7 @@ function UserOps() {
   return (
     <>
       <div className="spec" style={{ marginBottom:18 }}>
-        spec §14.6：4 种角色 · 本周暂用 is_admin 字段，生产环境按 PocketBase _superusers + 集合规则细分。
+        spec §14.6：5 种角色（super_admin / content_ops / reviewer / customer_support / member），见 user_profiles.role。
       </div>
       <div className="grid g2">
         <div className="card-ops"><h4>超级管理员</h4><p>全部权限</p></div>

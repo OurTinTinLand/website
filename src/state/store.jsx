@@ -18,6 +18,46 @@ import { useCatalog } from './catalog.js';
 const StoreCtx = createContext(null);
 const ToastCtx = createContext(null);
 
+// ===== spec §14.6 · role 模型 =====
+// 5 个角色（与 backend/pb_migrations/1755000060_add_role_to_user_profiles.js 对齐）：
+//
+//   super_admin         全部权限（PB _superusers 自动映射）
+//   content_ops         内容管理 + 首页运营位（Tab ① + ②）
+//   reviewer            报名/投递审核 + 用户档案查询（Tab ③ + ⑤）
+//   customer_support    订单核销 + 用户历史行为（Tab ④ + ⑤）
+//   member              注册用户；个人中心 / 我的报名 / 我的订单
+export const ROLES = ['member', 'content_ops', 'reviewer', 'customer_support', 'super_admin'];
+const OPS_ROLES = ['super_admin', 'content_ops', 'reviewer', 'customer_support'];
+const ROLE_LABELS = {
+  super_admin: '超级管理员',
+  content_ops: '内容运营',
+  reviewer: '审核员',
+  customer_support: '客服',
+  member: '注册用户',
+};
+
+export function isOpsRole(role) {
+  return OPS_ROLES.indexOf(role) !== -1;
+}
+export function canAccessAdmin(session) {
+  return !!(session && session.logged && isOpsRole(session.role));
+}
+// 把 role ∈ {admin tabs} → 决定 Tab 是否可见（spec §14.6 角色 → Tab 映射）
+export function canSeeAdminTab(tabKey, session) {
+  if (!canAccessAdmin(session)) return false;
+  const role = session.role;
+  if (role === 'super_admin') return true;
+  // Tab ① 内容 / ② 首页运营位 = content_ops
+  if (tabKey === 'content' || tabKey === 'homeops') return role === 'content_ops';
+  // Tab ③ 审核 / ⑤ 用户权限 = reviewer
+  if (tabKey === 'review' || tabKey === 'users') return role === 'reviewer' || role === 'super_admin';
+  // Tab ④ 订单核销 = customer_support
+  if (tabKey === 'orders') return role === 'customer_support';
+  // Tab ⑥ 通知 = content_ops（运营团队公用）
+  if (tabKey === 'notify') return role === 'content_ops';
+  return false;
+}
+
 const nowStamp = () => new Date().toISOString().slice(0, 19).replace('T', ' ');
 
 const emptyProfile = () => ({
@@ -27,7 +67,7 @@ const emptyProfile = () => ({
 });
 
 export function StoreProvider({ children }) {
-  const [session,     setSession]     = useState(() => loadState('session', { logged: false, is_admin: false, method: '', user_id: '', email: '', profile: emptyProfile() }));
+  const [session,     setSession]     = useState(() => loadState('session', { logged: false, role: 'member', is_admin: false, method: '', user_id: '', email: '', profile: emptyProfile() }));
   const [orders,      setOrders]      = useState(() => loadState('orders', seedOrders));
   const [intents,     setIntents]     = useState(() => loadState('intents', seedIntents));
   const [mySignups,   setMySignups]   = useState(() => loadState('mySignups', []));
@@ -38,7 +78,7 @@ export function StoreProvider({ children }) {
   // Catalog 懒加载（PB 优先，失败降级到 seed）
   const [catalog, reloadCatalog] = useCatalog();
 
-  // PB 启动时尝试恢复 session
+  // PB 启动时尝试恢复 session（reload 后会再调 /api/auth/privy-bridge 更新 role）
   useEffect(() => {
     const restored = PB.loadUserSession();
     if (restored && restored.record) {
@@ -46,9 +86,12 @@ export function StoreProvider({ children }) {
       setSession((s) => ({
         ...s,
         logged: true,
-        method: '邮箱验证码',
+        method: s.method || '邮箱验证码',
         email: r.email || '',
         user_id: r.id,
+        // role 在首次 mount 后会被 AuthPage/RouteGuard 的 useEffect 异步刷；
+        // 这里先保持本地（如果用户已经登录过一次，role 是已写好的）
+        role: s.role && s.role !== 'member' ? s.role : (s.role || 'member'),
       }));
     }
   }, []);
@@ -65,41 +108,35 @@ export function StoreProvider({ children }) {
   const loginEmailOtp = useCallback(async (email, code) => {
     const data = await PB.verifyEmailCode(email, code);
     const r = data.record || {};
+    // 后端 verifyEmailCode 当前没回 role；以默认 'member' 写入，
+    // 运营角色由 admin 在后台 user_profiles 表里手动设。
     setSession({
-      logged: true, is_admin: false, method: '邮箱验证码',
+      logged: true,
+      is_admin: false,
+      role: 'member',
+      method: '邮箱验证码',
       email: r.email || email, user_id: r.id,
       profile: emptyProfile(),
     });
     return data;
   }, []);
 
-  // GitHub OAuth UI 占位（spec §6.2 P1）：
-  // 本周未接 OAuth，不走后端、不写 PB。调用方传入什么就是什么。
-  // 安全注意：纯前端伪造 session，不要给"管理员"权限。生产必须换成真 OAuth 回调。
-  const loginGithubMock = useCallback((email, ghLogin) => {
-    if (!email || !ghLogin) return { ok: false, error: '缺少 email 或 ghLogin' };
-    const id = 'u-gh-' + (ghLogin || email.split('@')[0]);
-    setSession({
-      logged: true, is_admin: false, method: 'GitHub (mock)',
-      email, user_id: id,
-      profile: { ...emptyProfile(), github: 'github.com/' + ghLogin },
-    });
-    return { ok: true, mock: true };
-  }, []);
+// GitHub（mock）已删除：v1.2 起所有 OAuth 都走 Privy，不再有 demo GitHub 登录
 
   const loginWallet = useCallback(async (address, signature, nonce) => {
     const data = await PB.verifyWallet(address, signature, nonce);
     const r = data.record || {};
     setSession({
-      logged: true, is_admin: false, method: 'Web3 钱包',
+      logged: true, is_admin: false, role: 'member',
+      method: 'Web3 钱包',
       email: r.email || '', user_id: r.id,
       profile: { ...emptyProfile(), wallet_address: address },
     });
     return data;
   }, []);
 
-  // Privy 桥接（spec §6.4）—— 接收后端 /api/auth/privy-bridge 返回值，写入 session
-  // payload 形如 { ok, token, record, login_method, subject, strict, email, method, ... }
+  // Privy 桥接（spec §6.4 + §14.6）—— 接收后端 /api/auth/privy-bridge 返回值，写入 session
+  // payload 形如 { ok, token, record, login_method, subject, strict, role, email, method, ... }
   const loginPrivyBridge = useCallback(async (payload) => {
     if (!payload || !payload.token || !payload.record) {
       throw new Error('Privy 桥接响应缺少 token/record');
@@ -111,9 +148,14 @@ export function StoreProvider({ children }) {
       apple:'Apple', wallet:'Web3 钱包', email:'邮箱验证码', sms:'短信', privy:'Privy',
     };
     const methodLabel = labelByMethod[method] || 'Privy';
+    // 角色（spec §14.6）：server 解析后塞进来；缺省 member。
+    const role = (payload.role && ROLES.indexOf(payload.role) !== -1) ? payload.role : 'member';
     setSession({
       logged: true,
-      is_admin: false,
+      // 旧字段保留（前端其它地方可能仍读 is_admin）；
+      // 新代码应该读 role 与 canAccessAdmin(session)。
+      is_admin: isOpsRole(role),
+      role: role,
       method: methodLabel,
       email: r.email || (payload.email || ''),
       user_id: r.id,
@@ -123,25 +165,19 @@ export function StoreProvider({ children }) {
         ? { ...emptyProfile(), wallet_address: payload.subject || '' }
         : emptyProfile(),
       // 内部小标记：哪些 method 走过（方便后续风控 / 招聘板块判断）
-      privy: { subject: payload.subject || '', strict: !!payload.strict, method },
+      privy: { subject: payload.subject || '', strict: !!payload.strict, method, role },
     });
     return payload;
   }, []);
 
   const logout = useCallback(() => {
     PB.logout();
-    setSession({ logged: false, is_admin: false, method: '', user_id: '', email: '', profile: emptyProfile() });
+    setSession({ logged: false, is_admin: false, role: 'member', method: '', user_id: '', email: '', profile: emptyProfile() });
     setMySignups([]);
   }, []);
 
-  const demoAdmin = useCallback(() => {
-    setSession((s) => ({
-      ...s, logged: true, is_admin: true,
-      method:  s.method  || '邮箱验证码',
-      email:   s.email   || 'ops@tintinland.com',
-      user_id: s.user_id || 'u-ops',
-    }));
-  }, []);
+// demoAdmin() 删除 — v1.2 前端的运营身份必须走后端 role 解析；
+// 没有 PB _superusers / user_profiles.role，就不显示 admin 内容。
 
   const saveProfile = useCallback((p) => {
     setSession((s) => {
@@ -278,7 +314,9 @@ export function StoreProvider({ children }) {
     session, orders, intents, mySignups, orderSeq, reviewQueue, thTabReq,
     catalog,
     // auth
-    loginEmailOtp, loginGithubMock, loginWallet, loginPrivyBridge, logout, demoAdmin, saveProfile,
+    loginEmailOtp, loginWallet, loginPrivyBridge, logout, saveProfile,
+    // role helpers（spec §14.6）
+    canAccessAdmin, canSeeAdminTab, isOpsRole, ROLES, ROLE_LABELS,
     // mutations
     addOrder, verifyOrder, resendAdvisorCode,
     addIntent, contactIntent, closeIntent, addSignup,
@@ -288,7 +326,7 @@ export function StoreProvider({ children }) {
     // PB 原始 client（运营后台调用 listJobPostings 等高级操作）
     pb: PB,
   }), [session, orders, intents, mySignups, orderSeq, reviewQueue, thTabReq, catalog,
-      loginEmailOtp, loginGithubMock, loginWallet, logout, demoAdmin, saveProfile,
+      loginEmailOtp, loginWallet, logout, saveProfile,
       addOrder, verifyOrder, resendAdvisorCode, addIntent, contactIntent, closeIntent, addSignup,
       reviewSubmission, addReviewItem, resetAll]);
 

@@ -11,7 +11,7 @@ import { PrivyLoginEntry, usePrivyStatus } from '../components/Auth/PrivyProvide
 const ESC = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
 export function LoginModal({ open, afterLogin, onClose }) {
-  const { loginEmailOtp, loginGithubMock, loginPrivyBridge } = useStore();
+  const { loginEmailOtp, loginPrivyBridge } = useStore();
   const toast = useToast();
   const [step, setStep] = useState('choose');
   const privyStatus = usePrivyStatus();
@@ -73,29 +73,6 @@ export function LoginModal({ open, afterLogin, onClose }) {
     }
   };
 
-  const walletLogin = async () => {
-    setPending(true);
-    try {
-      const r = await PB.getWalletNonce();
-      // 真签名留给 V1.1（spec §6.2 P1）；当前仅 nonce-only 校验
-      // 演示用：传一个假签名，后端记录但不会真正校验
-      try {
-        await PB.verifyWallet('0xFEED1234', 'demo-sig', r.nonce);
-        onLoginOk('Web3 钱包');
-      } catch (verifyErr) {
-        // 后端会因为签名错误拒绝；演示模式下用 github 占位回退
-        loginGithubMock('0xFEED1234@wallet.local', 'wallet_demo');
-        toast.show('钱包真实签名校验 V1.1 上线，本周 nonce-only 演示');
-        doClose();
-        if (afterLogin) setTimeout(afterLogin, 320);
-      }
-    } catch (err) {
-      toast.show('钱包登录失败：' + (err.message || 'unknown'));
-    } finally {
-      setPending(false);
-    }
-  };
-
   return (
     <div className="mask on" onClick={(e) => { if (e.target === e.currentTarget) doClose(); }}>
       <div className="modal narrow">
@@ -105,38 +82,27 @@ export function LoginModal({ open, afterLogin, onClose }) {
           {step === 'choose' && (
             <>
               <h2 style={{ fontSize:26 }}>进来看看</h2>
-              <p className="xs" style={{ margin:'12px 0 22px' }}>零填表 · 不收手机号、不实名、不填职业公司。</p>
+              <p className="xs" style={{ margin:'12px 0 22px' }}>
+                用 <b>Privy</b> 一键登录：邮箱 / Google / X / GitHub / Discord / Apple / MetaMask 任选一。
+                <br/>三秒完成 · 零填表 · 不收手机号、不实名、不填职业公司。
+              </p>
 
-              <button className="lm" disabled={pending} onClick={() => setStep('email')}>
-                邮箱验证码<span className="bg">本周主力</span>
-              </button>
-
-              <button className="lm" disabled={pending} onClick={() => {
-                toast.show('i18n 留到 V1.1（微信资质审核中）');
-              }}>
-                微信一键登录<span className="bg">UI 就绪</span>
-              </button>
-
+              {/* 主 CTA — Privy 一键登录（spec §6.4） */}
               <button className="lm" disabled={pending} onClick={() => setStep('privy')}>
                 Privy 一键登录（OAuth + 钱包）<span className="bg">{privyStatus.enabled ? (privyStatus.sdkReady ? 'SDK' : '加载中') : '离线 fallback'}</span>
               </button>
 
-              {/* 保留旧 GitHub mock 用于招聘场景演示（spec §6.2 P1） */}
-              <details style={{ marginTop: 4 }}>
-                <summary style={{ fontSize: 12, color: 'var(--ink-3)', cursor: 'pointer', padding: '6px 2px' }}>
-                  还有：GitHub mock（招聘演示）· 钱包签名
-                </summary>
-                <button className="lm" disabled={pending} onClick={() => {
-                  loginGithubMock(email || 'gh@tintin.land', 'gh_demo_user');
-                  onLoginOk('GitHub');
-                }}>
-                  GitHub mock 登录<span className="bg">招聘</span>
+              {/* 离线 fallback：没装 SDK / 没设 APP_ID 时才出现 */}
+              {!privyStatus.enabled && (
+                <button className="lm" disabled={pending} onClick={() => setStep('email')}
+                        style={{ marginTop: 6 }}>
+                  邮箱验证码<span className="bg">fallback</span>
                 </button>
-              </details>
+              )}
 
-              <div className="wl">或 <a onClick={walletLogin}>用钱包签名登录</a></div>
-
-              <div className="spec">签名一次即可，不转账、无 gas。职业公司等信息延后到报名场景再收集。</div>
+              <div className="spec">
+                登录后：可报名课程 / 活动 / 黑客松；运营账号自动识别角色解锁运营后台。
+              </div>
             </>
           )}
 

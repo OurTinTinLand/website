@@ -155,3 +155,43 @@ index.html                                   ← 占位符 <!--INJECT:PRIVY_CONF
 
 实现路径参考：[Privy Server-Side Sessions](https://docs.privy.io/guide/react/server-auth/sessions)。PB v0.39 + goja 无 ES256 native 实现，需在 `pb_hooks/auth.pb.js` 内 fork 一个 Node 子进程调 `jose` 库验签，开销稍大但合理。
 
+---
+
+## v1.2 · role 模型（spec §14.6）
+
+| role | 来源 | 自动识别 | 运营后台 |
+| --- | --- | --- | --- |
+| `super_admin` | PB `_superusers` 表（email 匹配） | ✓ | 全部 6 个 Tab |
+| `content_ops` | `user_profiles.role` 字段 | 由 PB 后台手动设 | ① 内容 + ② 首页运营位 |
+| `reviewer` | `user_profiles.role` 字段 | 由 PB 后台手动设 | ③ 审核 + ⑤ 用户权限 |
+| `customer_support` | `user_profiles.role` 字段 | 由 PB 后台手动设 | ④ 订单核销 + ⑤ 用户权限 |
+| `member` | 默认 | 新注册用户 | 无 |
+
+### 后端解析逻辑（auth.pb.js）
+
+```js
+// 在 /api/auth/privy-bridge handler 末尾
+function resolveRole(profile, email) {
+    // 1. PB _superusers 表里有这个 email → super_admin
+    // 2. 否则 user_profiles.role 字段
+    // 3. 都没有 → 'member'（默认）
+}
+```
+
+### 前端使用（src/state/store.jsx）
+
+```js
+import { canAccessAdmin, canSeeAdminTab, isOpsRole, ROLES } from 'src/state/store';
+
+// 路由门
+if (canAccessAdmin(session))       showAdmin();
+
+canSeeAdminTab('content', session)   // → content_ops / super_admin 看
+canSeeAdminTab('review', session)    // → reviewer / super_admin 看
+canSeeAdminTab('orders', session)    // → customer_support / super_admin 看
+```
+
+### 给运营账号赋 role 的后台操作
+
+PB 后台 → `user_profiles` collection → 找用户 → 改 `role` 字段 → 选下拉值（5 档）
+

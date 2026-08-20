@@ -2,9 +2,11 @@
 # ============================================================
 # 统一镜像启动脚本 · 前端 + PocketBase 共容器
 # ------------------------------------------------------------
-# 1) 启动 PocketBase（内部端口 PB_PORT，不暴露公网）
-# 2) 等 PB /api/health 通
-# 3) exec Node（监听外部 PORT，对 /api/* 与 /_/* 反向代理到 PB）
+# 1) Bootstrap 超管账号（PB_ADMIN_EMAIL / PB_ADMIN_PASSWORD 环境变量）
+#    用 `pocketbase superuser upsert` 直接落库，不依赖 web UI
+# 2) 启动 PocketBase（内部端口 PB_PORT，不暴露公网）
+# 3) 等 PB /api/health 通
+# 4) exec Node（监听外部 PORT，对 /api/* 与 /_/* 反向代理到 PB）
 # ============================================================
 set -e
 
@@ -18,6 +20,24 @@ PORT="${PORT:-3000}"
 # 不会影响 /api/* 由 server.js 反代（同源代理不算跨域）。
 PB_ORIGINS="${PB_ORIGINS:-*}"
 
+# 超管账号：默认值与 src/utils/pb-client.js 里的硬编码常量一致。
+# 任何改了 PB_ADMIN_PASSWORD 的部署，pb-client.js 会通过 window.PB_ADMIN_PASSWORD
+# 拿到新值（见 index.html 注入逻辑），保持前后端同步。
+PB_ADMIN_EMAIL="${PB_ADMIN_EMAIL:-admin@tintin.land}"
+PB_ADMIN_PASSWORD="${PB_ADMIN_PASSWORD:-tintinland2026}"
+
+# 1) Bootstrap 超管账号 —— 用 upsert 保证幂等：
+#    - 已存在（从旧 volume 恢复）：更新密码
+#    - 不存在（首次启动 / 新 volume）：创建
+# 这一步必须在 serve 之前；serve 启动后数据库上锁就 upsert 不进去了。
+# 注意：--hooksDir 也要带上，否则 hooks 会报 LOADED 失败（v0.27+ 强校验）
+echo "[start.sh] bootstrapping superuser ${PB_ADMIN_EMAIL} (dir=/pb_data)"
+/pb/pocketbase superuser upsert "${PB_ADMIN_EMAIL}" "${PB_ADMIN_PASSWORD}" \
+  --dir=/pb_data \
+  --hooksDir=/pb/hooks \
+  --migrationsDir=/pb/migrations
+
+# 2) 起 PB
 echo "[start.sh] starting PocketBase on :${PB_PORT} (origins=${PB_ORIGINS})"
 /pb/pocketbase serve \
   --http=0.0.0.0:${PB_PORT} \
@@ -47,4 +67,9 @@ trap 'echo "[start.sh] caught signal, terminating PocketBase (pid=${PB_PID})"; k
 
 echo "[start.sh] starting Node on :${PORT} (proxying /api/, /_/ -> http://127.0.0.1:${PB_PORT})"
 export PB_URL="http://127.0.0.1:${PB_PORT}"
+# 把超管账号透传给前端（注入到 index.html 渲染时的 window.PB_ADMIN_EMAIL/PASSWORD）
+# 这样运营后台的 demoAdmin / admin CRUD 会用最新的超管密码，不会因 pb-client.js 硬编码
+# 与 PB 服务端不同步而 401。
+export PB_ADMIN_EMAIL
+export PB_ADMIN_PASSWORD
 exec node server.js

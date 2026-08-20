@@ -26,8 +26,11 @@ const PB_URL = (() => {
     // 默认：连本机 8090（dev 最常见）。生产环境应在 index.html 注入 window.PB_URL。
     return "http://127.0.0.1:8090";
 })();
-const SUPERUSER_EMAIL = "admin@tintin.land";
-const SUPERUSER_PASSWORD = "tintinland2026";
+// 超管账号：优先读运行时注入（window.PB_ADMIN_EMAIL/PASSWORD，由 server.js / start.sh
+// 在 index.html 渲染时设置），找不到时回落到默认值（与 start.sh / Dockerfile 一致）。
+// 这样部署方改 PB_ADMIN_PASSWORD 环境变量后，前端会跟着更新，不用重新 build。
+const SUPERUSER_EMAIL = (typeof window !== "undefined" && window.PB_ADMIN_EMAIL) || "admin@tintin.land";
+const SUPERUSER_PASSWORD = (typeof window !== "undefined" && window.PB_ADMIN_PASSWORD) || "tintinland2026";
 
 export class PbError extends Error {
     constructor(status, message, data) {

@@ -21,11 +21,21 @@
 #   docker build -t tintinland-all .
 #   docker run --rm -p 3000:3000 \
 #     -e PORT=3000 \
+#     -e PB_ADMIN_EMAIL=admin@tintin.land \
+#     -e PB_ADMIN_PASSWORD=tintinland2026 \
+#     -e PB_ORIGINS="http://localhost:3000" \
 #     -v $PWD/backend/pb_data:/pb_data \
 #     tintinland-all
 #   curl http://localhost:3000/
 #   curl http://localhost:3000/api/health   # 经 Node 代理
 #   curl http://localhost:3000/api/collections/courses/records
+#
+# 超管账号（PB_ADMIN_EMAIL / PB_ADMIN_PASSWORD）：
+#   - start.sh 会用 `pocketbase superuser upsert` 把超管账号写到 /pb_data，
+#     幂等（首次创建、后续覆盖密码）。
+#   - 默认值与 src/utils/pb-client.js 硬编码一致；生产环境务必改默认值。
+#   - server.js 会把这两个值注入到 index.html 的 window.PB_ADMIN_EMAIL/PASSWORD，
+#     前端运营后台会用最新值调用 PB，不再吃硬编码的过期密码。
 # ============================================================
 
 # ---- Stage 1: 装 node + 构建前端 + 拉 PocketBase ----

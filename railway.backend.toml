@@ -13,7 +13,11 @@ builder = "DOCKERFILE"
 dockerfilePath = "Dockerfile.backend"
 
 [deploy]
-startCommand = "sh -c \"/pb/pocketbase serve --http=0.0.0.0:${PORT} --dir=${PB_DATA:-/pb_data} --hooksDir=/pb/hooks --migrationsDir=/pb/migrations --hooksWatch=false\""
+# 注意：startCommand 会覆盖 Dockerfile 的 CMD，所以这里必须显式跑 superuser upsert，
+# 否则独立部署时超管账号不会自动 bootstrap。
+# 想从 Railway 这边覆盖密码：在 service Variables 里设 PB_ADMIN_PASSWORD 后，
+# 重启容器会自动同步到 /pb_data/_superusers。
+startCommand = "sh -c \"PB_ADMIN_EMAIL=\${PB_ADMIN_EMAIL:-admin@tintin.land} PB_ADMIN_PASSWORD=\${PB_ADMIN_PASSWORD:-tintinland2026} && /pb/pocketbase superuser upsert \\\"\${PB_ADMIN_EMAIL}\\\" \\\"\${PB_ADMIN_PASSWORD}\\\" --dir=${PB_DATA:-/pb_data} --hooksDir=/pb/hooks --migrationsDir=/pb/migrations && /pb/pocketbase serve --http=0.0.0.0:${PORT} --dir=${PB_DATA:-/pb_data} --hooksDir=/pb/hooks --migrationsDir=/pb/migrations --hooksWatch=false\""
 healthcheckPath = "/api/health"
 healthcheckTimeout = 30
 restartPolicyType = "ON_FAILURE"

@@ -51,6 +51,11 @@ EXPOSE ${PORT}
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
   CMD wget --quiet --tries=1 --spider http://127.0.0.1:${PORT}/api/health || exit 1
 
+# 超管账号 bootstrap：默认与 src/utils/pb-client.js 一致；
+# 部署方覆盖 PB_ADMIN_PASSWORD 时，PB_DB 里的密码会被同步刷新（upsert 幂等）。
+ENV PB_ADMIN_EMAIL=admin@tintin.land
+ENV PB_ADMIN_PASSWORD=tintinland2026
+
 # shell 形式让 ${PORT} 展开；显式传入 dir/hooks/migrations
 # --automigrate (默认 true) 自动应用 /pb/migrations 下的 JS 迁移
-CMD sh -c "/pb/pocketbase serve --http=0.0.0.0:${PORT} --dir=${PB_DATA} --hooksDir=/pb/hooks --migrationsDir=/pb/migrations --hooksWatch=false"
+CMD sh -c "/pb/pocketbase superuser upsert \"${PB_ADMIN_EMAIL}\" \"${PB_ADMIN_PASSWORD}\" --dir=${PB_DATA} --hooksDir=/pb/hooks --migrationsDir=/pb/migrations && /pb/pocketbase serve --http=0.0.0.0:${PORT} --dir=${PB_DATA} --hooksDir=/pb/hooks --migrationsDir=/pb/migrations --hooksWatch=false"

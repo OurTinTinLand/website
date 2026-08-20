@@ -209,6 +209,8 @@ function adminApiFor(kind) {
 }
 
 // 把前端的 draft 转成 PB 需要的字段；schema 不存在的字段会被丢弃
+// 注意：PB 的 select 字段如果 required=true，传空串会被服务端忽略但不报错，
+//      导致"看起来写成功了但其实没落库"。这里对必填 select 都做兜底。
 function toPbPayload(kind, draft) {
   const base = {
     title: draft.title || '（无标题）',
@@ -217,32 +219,69 @@ function toPbPayload(kind, draft) {
     signup_review_required: !!draft.review_required,
     signup_fields_config: draft.fields_config || {},
   };
+  // slug 兜底：PB schema 都要求 unique slug（来自旧 v1.0 init），
+  // 用 title 拼一个基本可读的 slug；运营后续可在后台 UI 里改更友好的版本
+  const title = draft.title || '（无标题）';
+  const slugFallback = String(title)
+    .toLowerCase()
+    .replace(/[^\w\u4e00-\u9fa5-]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 80) || 'untitled-' + Date.now();
+  // 只在非空时输出字段；PB 对 required+空值的 select 会静默丢，
+  // 所以此处宁可少字段，也不要把空串传过去。
+  const out = (o, k, v) => { if (v !== '' && v !== null && v !== undefined) o[k] = v; return o; };
   if (kind === 'courses') {
+    // PB 的 category 是 required select，不传或传 "" 会静默失败（API 返回 200 但实际不落库）。
+    // 兜底给 'AI 应用'；运营在 UI 上选别的就覆盖。
     return {
       ...base,
-      category: draft.category || '',
-      subcategory: draft.subcategory || '',
+      slug: draft.slug || slugFallback,
       tags: Array.isArray(draft.tags) ? draft.tags : [],
-      // 必填兜底：PB schema 要求 category difficulty form price_type
+      category: draft.category || 'AI 应用',
+      subcategory: draft.subcategory || '',
       difficulty: draft.difficulty || '入门',
       form: draft.form || '直播',
       price_type: draft.price_type || 'free',
     };
   }
   if (kind === 'events') {
-    return { ...base, tag: draft.category || '' };
+    // events.type / hackathons.theme / jobs.role / apps.type 都是 required select，
+    // 不传/传空会导致 PB 静默失败（API 返回 200 但 INSERT 不执行）。
+    // 兜底给个合理默认值；运营在 UI 选别的就覆盖。
+    return {
+      ...base,
+      slug: draft.slug || slugFallback,
+      type: draft.type || '线上',
+      tag: draft.category || '',
+    };
   }
   if (kind === 'hackathons') {
-    return { ...base, theme: draft.category || '' };
+    return {
+      ...base,
+      slug: draft.slug || slugFallback,
+      theme: draft.theme || draft.category || '通用',
+    };
   }
   if (kind === 'jobs') {
-    return { ...base, role: draft.category || '', company: draft.company || '' };
+    return {
+      ...base,
+      slug: draft.slug || slugFallback,
+      role: draft.role || draft.category || '工程',
+      company: draft.company || '',
+    };
   }
   if (kind === 'apps') {
-    return { ...base, name: draft.title || '', ic: draft.ic || '' };
+    // apps schema 用 slug，name 字段没有 unique 约束
+    return {
+      ...base,
+      slug: draft.slug || slugFallback,
+      name: title,
+      type: draft.type || 'agency',
+      ic: draft.ic || '',
+    };
   }
   if (kind === 'providers') {
-    return { ...base, name: draft.title || '' };
+    return { ...base, slug: draft.slug || slugFallback, name: title };
   }
   return base;
 }

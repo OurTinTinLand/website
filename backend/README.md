@@ -49,6 +49,11 @@ curl http://127.0.0.1:8090/api/health
 | email   | `admin@tintin.land` |
 | password| `tintinland2026`    |
 
+> V1.1 部署：通过 `PB_ADMIN_EMAIL` / `PB_ADMIN_PASSWORD` 环境变量覆盖默认值。
+> `Dockerfile` + `start.sh` 启动时会跑 `pocketbase superuser upsert`（幂等），自动落库。
+> `server.js` 同时把这两个值注入到 `index.html` 的 `window.PB_ADMIN_EMAIL/PASSWORD`，
+> 前端 `src/utils/pb-client.js` 会优先读运行时注入，避免硬编码密码过期导致 401。
+
 ## 2. 数据迁移
 
 PocketBase v0.23+ 用 JS 写迁移。所有迁移在启动时自动按文件名升序 apply 到

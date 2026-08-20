@@ -68,7 +68,7 @@ const args = [
   // v1.2 ESM 化（spec §6.4）：
   //   大包（@privy-io/react-auth / wagmi / viem / zustand 等）走 esm.sh CDN；
   //   用户浏览器在首次加载时 fetch，CDN 有缓存。bundle.js 只剩下应用代码 + React。
-  //   alias 写完整 URL → 不需要 importmap，浏览器直接 fetch。
+  //   alias 写完整 URL → 浏览器直接 fetch；esm.sh 的子模块走绝对路径 shim，无需 importmap。
   '--alias:@privy-io/react-auth=https://esm.sh/@privy-io/react-auth@3.37.4',
   '--alias:wagmi=https://esm.sh/wagmi@2.12.0',
   '--alias:viem=https://esm.sh/viem@2.21.0',

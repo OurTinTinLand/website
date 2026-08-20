@@ -19,25 +19,12 @@
 
   <!--
     v1.2 全 ESM 化（spec §6.4 / §14.6）
-    ------------------------------------------------------
-    bundle.js 是 ES Module（type="module"），浏览器以 module 加载它。
-    - 应用代码：esbuild --alias 把 'react' / '@privy-io/react-auth' / 'wagmi' / 'viem'
-      等替换为完整 esm.sh URL，直接 fetch。
-    - esm.sh 自己吐出的 shim（处理依赖树）可能含 bare import（如 `import React from "react"`），
-      这些都走下面这个 importmap。
+    bundle.js 是 ES Module（type="module"），浏览器以 module 加载。
+    esbuild --alias 把 'react' / '@privy-io/react-auth' / 'wagmi' / 'viem' 等
+    替换为完整 esm.sh URL，浏览器直接 fetch；esm.sh 反吐的子模块也走
+    路径绝对（/pkg@ver/...）的 shim，无需 importmap。
     单一 React 实例（来自 esm.sh/react@18）：bundled React 与 Privy 内部模块共享。
   -->
-  <script type="importmap">
-  {
-    "imports": {
-      "react": "https://esm.sh/react@18.3.1",
-      "react-dom": "https://esm.sh/react-dom@18.3.1",
-      "react-dom/client": "https://esm.sh/react-dom@18.3.1/client",
-      "react/jsx-runtime": "https://esm.sh/react@18.3.1/jsx-runtime",
-      "react/jsx-dev-runtime": "https://esm.sh/react@18.3.1/jsx-dev-runtime"
-    }
-  }
-  </script>
 </head>
 <body>
   <div id="root"></div>

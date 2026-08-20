@@ -195,3 +195,35 @@ canSeeAdminTab('orders', session)    // → customer_support / super_admin 看
 
 PB 后台 → `user_profiles` collection → 找用户 → 改 `role` 字段 → 选下拉值（5 档）
 
+---
+
+## v1.2·ESM · bundle 切 ESM（重要）
+
+v1.2 后期修复：把整包（bundle + react + @privy-io/react-auth 等）切到 ESM。
+
+**为什么**：
+- iife 时代的 bundle 用 UMD React，Privy 自己从 esm.sh 拉私有 ESM；两套 React 不共享 dispatcher
+- `useContext()` 返回 null → PrivyProvider 挂载时崩
+
+**怎么切的**（4 处文件改动）：
+
+1. `build.js` — `--format=iife` → `--format=esm`，并为每个大包加 `--alias:NAME=https://esm.sh/NAME@VER`
+2. `postbuild.js` — no-op stub（之前 iife 时代把 window.React 织入 bundle 内；现在不需要了）
+3. `PrivyProviderRoot.jsx` — 静态 `import { PrivyProvider, usePrivy } from '@privy-io/react-auth'`，删动态 Function() loader
+4. `index.html` — 删 UMD React scripts，改 `<script type="module">`，加一个小 importmap
+
+**bundle 体积**：
+| 形态 | raw | gzipped |
+| --- | --- | --- |
+| iife + UMD inline | 1.28 MB | 525 KB |
+| esm + CDN alias | 1.25 MB | 326 KB |
+
+**唯一的 React 实例**：
+- 应用代码：`import React from "https://esm.sh/react@18"`（alias 重写后）
+- Privy 内部模块：`esm.sh/@privy-io/react-auth` 反吐的 shim 里 `import "react"` → importmap → `https://esm.sh/react@18.3.1`
+- 两边都指向同一份 esm.sh React，浏览器视为同一 module 引用，dispatcher / context 共享
+
+**importmap 仍在**（v1.2 早期版本加的）：
+- 作用：把 esm.sh 内部模块可能用到的 bare specifier（react / react-dom / react-dom/client / react/jsx-runtime）解析到 esm.sh URL
+- 应用代码本身已走完整 URL alias，不需要 importmap；但 esm.sh 反吐的子模块可能含 bare import，不能去掉
+

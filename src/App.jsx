@@ -1,6 +1,6 @@
 // 顶层装配
 import React, { useState, useEffect } from 'react';
-import { StoreProvider, ToastProvider, useStore } from './state/store';
+import { StoreProvider, ToastProvider, useStore, useToast } from './state/store';
 import { Router, useRoute } from './utils/router';
 
 import { TopNav } from './components/TopNav';

@@ -10,7 +10,8 @@
 | `Dockerfile` | 单进程镜像构建（pocketbase + pb_public） |
 | `start.sh` | 容器启动脚本（superuser upsert + `pocketbase serve`） |
 | `railway.toml` | Railway 单 Service 配置（默认指向 `Dockerfile`） |
-| `backend/pb_hooks/` | PocketBase 钩子（含 `inject_secrets.pb.js` 注入 `window.PB_ADMIN_DEMO_SECRET`） |
+| `backend/pb_hooks/` | PocketBase 钩子（含 `inject_secrets.pb.js` 注入 `window.PB_ADMIN_DEMO_SECRET` + `auth.pb.js` 实现 `/api/auth/{email-code,email-code/verify,wallet/nonce,wallet/verify,privy-bridge,wechat/url,wechat/callback}`） |
+| `src/components/Auth/` | Privy 登录面板（spec §6.4）：`<PrivyProviderRoot>` 自适应 SDK / 离线 fallback，详见 [PRIVY.md](PRIVY.md) |
 | `backend/pb_migrations/` | PocketBase schema 迁移（spec v1.1） |
 | `backend/pb_public/` | 静态前端（构建产物：`index.html` + `dist/` + `src/styles/` + `assets-claude/`） |
 | `build.js` | esbuild 打包到 `backend/pb_public/` |
@@ -70,6 +71,10 @@ Railway Service → Settings → Domains → 添加 `tintin.land`（按 Railway 
 | `PB_ADMIN_EMAIL` | 否 | `admin@tintin.land` | 超管邮箱 |
 | `PB_ADMIN_PASSWORD` | **生产必改** | `tintinland2026` | 超管密码（首次启动 upsert 到 PB） |
 | `PB_ADMIN_DEMO_SECRET` | **生产必设** | `""` | 运营后台 demo 入口 secret；不设则 demo admin 401 |
+| `PRIVY_APP_ID` | 否 | `""` | Privy App ID；不设时前端自动走离线 OAuth 兜底登录（详见 [PRIVY.md](PRIVY.md)）。登录集成 v1.2 |
+| `PRIVY_CLIENT_ID` | 否 | `""` | Privy Public Client ID；OAuth 客户端配置用（仅设了 SDK 才需要） |
+| `PRIVY_LOGIN_METHODS` | 否 | `email,google,x,github,discord,wallet` | 逗号分隔白名单；空值退回默认 |
+| `PRIVY_APP_SECRET` | 否 | `""` | 仅用于后端严格模式 JWT 验签（v1.2 路线）；本期默认 trust 模式与 email-OTP 同级 |
 | `PB_ORIGINS` | 否 | `*` | 逗号分隔的 CORS allowlist |
 | `RAILWAY_VOLUME_MOUNT_PATH` | 自动注入 | — | Railway 注入的 Volume 挂载点；start.sh 自动跟随 |
 
@@ -176,3 +181,18 @@ docker logs <container-id>
 1. Railway Variables 里有没有 `PB_ADMIN_DEMO_SECRET`
 2. 浏览器 console 里看 `window.PB_ADMIN_DEMO_SECRET` 是不是 undefined（说明 onServe hook 没注入 —— 容器环境变量可能没传进去）
 3. 查看响应源码：`curl -sS https://your-app.example.com/ | grep PB_ADMIN_DEMO_SECRET`
+
+### 6.4 Privy 登录不可用
+
+1. 浏览器 console 看 `window.PRIVY_APP_ID` 是不是空字符串
+   - 空：没设环境变量 → LoginModal 走「离线 OAuth 兜底」（不报错）
+   - 设有：跳到第 2 步
+2. console 应该看到 `PrivyProviderRoot` 装载 SDK 时的日志；如看不到说明 `PrivyProviderRoot` 的 `useEffect` 还没跑
+3. `npm run verify:privy` 验证 `@privy-io/react-auth` 已装；如失败，`npm install @privy-io/react-auth@latest --no-save --ignore-scripts`
+4. 还是不行？看 `/api/auth/privy-bridge` 响应：浏览器 console 里看 `XHR` 面板，确认返回里有 `record.email` / `token`
+
+### 6.5 Privy OAuth provider 报 redirect_uri_mismatch
+
+1. https://dashboard.privy.io → 你 App → User management → Providers → 选中的 provider → Redirect URIs
+2. 加上 `${your-domain}/auth/callback?provider=xxx`，例如 `https://tintin.land/auth/callback?provider=google`
+3. 同样也要到 OAuth provider 的后台（Google Cloud / GitHub OAuth Apps 等）加 callback URL

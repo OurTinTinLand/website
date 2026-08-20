@@ -6,13 +6,19 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useStore, useToast } from '../state/store';
 import * as PB from '../utils/pb-client.js';
+import { PrivyLoginEntry, usePrivyStatus } from '../components/Auth/PrivyProviderRoot.jsx';
 
 const ESC = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
 export function LoginModal({ open, afterLogin, onClose }) {
-  const { loginEmailOtp, loginGithubMock } = useStore();
+  const { loginEmailOtp, loginGithubMock, loginPrivyBridge } = useStore();
   const toast = useToast();
   const [step, setStep] = useState('choose');
+  const privyStatus = usePrivyStatus();
+  const LABEL_METHOD = (m) => ({
+    google:'Google', x:'X (Twitter)', twitter:'Twitter', github:'GitHub', discord:'Discord',
+    apple:'Apple', wallet:'Web3 钱包', email:'邮箱', sms:'短信', privy:'Privy',
+  })[m] || 'Privy';
   const [email, setEmail] = useState('demo@tintin.land');
   const [pending, setPending] = useState(false);
   const [devCode, setDevCode] = useState(null);    // dev 环境 mail 没真发时 PB 会返回
@@ -111,12 +117,22 @@ export function LoginModal({ open, afterLogin, onClose }) {
                 微信一键登录<span className="bg">UI 就绪</span>
               </button>
 
-              <button className="lm" disabled={pending} onClick={() => {
-                loginGithubMock(email || 'gh@tintin.land', 'gh_demo_user');
-                onLoginOk('GitHub');
-              }}>
-                GitHub 登录<span className="bg">P1 · 招聘复用</span>
+              <button className="lm" disabled={pending} onClick={() => setStep('privy')}>
+                Privy 一键登录（OAuth + 钱包）<span className="bg">{privyStatus.enabled ? (privyStatus.sdkReady ? 'SDK' : '加载中') : '离线 fallback'}</span>
               </button>
+
+              {/* 保留旧 GitHub mock 用于招聘场景演示（spec §6.2 P1） */}
+              <details style={{ marginTop: 4 }}>
+                <summary style={{ fontSize: 12, color: 'var(--ink-3)', cursor: 'pointer', padding: '6px 2px' }}>
+                  还有：GitHub mock（招聘演示）· 钱包签名
+                </summary>
+                <button className="lm" disabled={pending} onClick={() => {
+                  loginGithubMock(email || 'gh@tintin.land', 'gh_demo_user');
+                  onLoginOk('GitHub');
+                }}>
+                  GitHub mock 登录<span className="bg">招聘</span>
+                </button>
+              </details>
 
               <div className="wl">或 <a onClick={walletLogin}>用钱包签名登录</a></div>
 
@@ -161,6 +177,31 @@ export function LoginModal({ open, afterLogin, onClose }) {
                 没收到？<a style={{ color:'var(--ink)', cursor:'pointer', fontWeight:540 }} onClick={sendCode}>重发</a>
               </p>
             </>
+          )}
+
+          {step === 'privy' && (
+            <PrivyLoginEntry
+              onCancel={() => setStep('choose')}
+              onLogin={async (payload) => {
+                // payload 已是后端 /api/auth/privy-bridge 的返回值（含 token + record）
+                try {
+                  if (payload && payload.token && payload.record) {
+                    await loginPrivyBridge(payload);
+                    const label = LABEL_METHOD(payload.login_method || payload.method);
+                    toast.show(`已用「${label}」登录 · ${payload.email || payload.record.email || ''}`);
+                    onLoginOk(label);
+                  } else if (payload && payload.demo_login) {
+                    // 离线 fallback（无 SDK 的演示模式）：直接 fake 一套 session
+                    await loginPrivyBridge(payload.demo_login);
+                    onLoginOk(LABEL_METHOD(payload.demo_login.login_method));
+                  } else {
+                    toast.show('Privy 桥接响应缺少 token/record（已忽略）');
+                  }
+                } catch (e) {
+                  toast.show('Privy 桥接失败：' + (e.message || 'unknown'));
+                }
+              }}
+            />
           )}
 
         </div>

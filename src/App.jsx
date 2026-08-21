@@ -48,7 +48,18 @@ function Shell() {
   const hackathons = catalog?.hackathons ?? seedHackathons;
   const jobs       = catalog?.jobs       ?? seedJobs;
 
-  const openLogin  = (after) => { setLoginAfter(() => after || null); setLoginOpen(true); };
+  // 统一登录入口：SDK enabled → 直接 dispatch app:openPrivyNative，PrivyNativeLauncher 监听后会直接弹 Privy native modal
+  //                SDK disabled → fallback 到 LoginModal（含 PrivyStandaloneLogin 离线 OAuth 兜底）
+  const openLogin  = (after) => {
+    const appId = window.PRIVY_APP_ID && String(window.PRIVY_APP_ID).trim();
+    if (appId) {
+      // 把 after 回调带在事件 detail 里，PrivyNativeLauncher 的 onComplete 会调它
+      window.dispatchEvent(new CustomEvent('app:openPrivyNative', { detail: { after } }));
+      return;
+    }
+    setLoginAfter(() => after || null);
+    setLoginOpen(true);
+  };
   const closeLogin = () => setLoginOpen(false);
 
   // 监听全局 'app:openLogin' 事件 —— AdminPage 那边没用 prop 链，只能靠 CustomEvent
@@ -99,7 +110,7 @@ function Shell() {
     if (page === 'enterprise') return <EnterprisePage onApply={handleApply} onGoto={go} />;
     if (page === 'about')      return <AboutPage />;
     if (page === 'member')     return <MemberPage openLogin={openLogin} />;
-    if (page === 'admin')      return <AdminPage />;
+    if (page === 'admin')      return <AdminPage openLogin={openLogin} />;
     if (page === 'authLogin')  return <AuthLoginPage openLogin={openLogin} />;
     if (page === 'authCallback') return <AuthCallbackPage />;
     if (page === 'notFound')   return <NotFoundPage />;

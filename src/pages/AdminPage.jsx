@@ -25,7 +25,7 @@ const TABS = [
   ['notify',    '⑥ 通知文案'],
 ];
 
-export function AdminPage() {
+export function AdminPage({ openLogin }) {
   const { session, canAccessAdmin, canSeeAdminTab } = useStore();
   const toast = useToast();
   const [tab, setTab] = useState('content');
@@ -52,14 +52,10 @@ export function AdminPage() {
         </p>
 
         {!canAccessAdmin(session) && <LoginPrompt onLogin={() => {
-          // SDK enabled → 发 app:openPrivyNative，PrivyNativeLauncher 监听后会直接弹 Privy native modal（不走 LoginModal）
-          // SDK disabled → fallback 到 app:openLogin，走 LoginModal → PrivyStandaloneLogin
-          const evt = (window.PRIVY_APP_ID && String(window.PRIVY_APP_ID).trim())
-            ? 'app:openPrivyNative'
-            : 'app:openLogin';
-          window.dispatchEvent(new CustomEvent(evt, {
-            detail: { after: () => location.reload() }
-          }));
+          // 统一入口：openLogin 按 PRIVY_APP_ID 自动分发
+          // SDK 启用 → 直接弹 Privy native modal，登录完成后会调 after → 刷新
+          // SDK 关闭 → 弹 LoginModal → StandaloneLogin fallback
+          openLogin(() => location.reload());
         }} />}
 
         {canAccessAdmin(session) && tab === 'content'   && <ContentCenter />}

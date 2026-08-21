@@ -191,6 +191,10 @@ export function getPrivyEnabled() {
 // 注意：必须挂在 PrivyProvider 内才能调 useLogin；所以放在 return <PrivyProvider>...</PrivyProvider> 里。
 function PrivyNativeLauncher() {
   const { ready, authenticated, getAccessToken } = usePrivy();
+  // pendingAfter：调用方传入的 after 回调（如 () => location.reload() / () => openPay(courseId)）
+  // onComplete 跑完 PB 桥接后再调，确保"登录完成后要做什么"的钩子被执行
+  let pendingAfter = null;
+
   const { login } = useLogin({
     onComplete: async ({ user, isNewUser, loginMethod, loginAccount }) => {
       try {
@@ -210,12 +214,16 @@ function PrivyNativeLauncher() {
           email, subject, method, access_token: accessToken,
         });
         if (data && data.token && data.record) {
-          // 桥接成功 → 同步到 store
           const { loginPrivyBridge } = await import('../../state/store.jsx');
           try { await loginPrivyBridge(data); } catch (_) {}
-          // 通知任何挂载中的 LoginModal 类型回调（detail after 钩子）
           window.dispatchEvent(new CustomEvent('app:auth:login', { detail: data }));
-          // 简单粗暴刷新（与 AdminPage 之前传的 location.reload() 行为一致）
+
+          // 先跑调用方传的 after，再 reload（after 通常自己会 reload）
+          const after = pendingAfter;
+          pendingAfter = null;
+          if (typeof after === 'function') {
+            try { await after(); } catch (e) { console.warn('[PrivyNativeLauncher] after() failed:', e); }
+          }
           setTimeout(() => location.reload(), 200);
         }
       } catch (e) {
@@ -228,13 +236,18 @@ function PrivyNativeLauncher() {
   });
 
   useEffect(() => {
-    const handler = () => {
+    const handler = (e) => {
+      pendingAfter = (e && e.detail && typeof e.detail.after === 'function') ? e.detail.after : null;
       if (!ready) {
         console.warn('[PrivyNativeLauncher] Privy not ready yet; ignored');
         return;
       }
       if (authenticated) {
         console.warn('[PrivyNativeLauncher] already authenticated; ignored');
+        // 已登录也跑一下 after（让调用方跳转/reload）
+        const after = pendingAfter;
+        pendingAfter = null;
+        if (typeof after === 'function') { try { after(); } catch (_) {} }
         return;
       }
       try {

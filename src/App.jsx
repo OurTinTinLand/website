@@ -50,6 +50,14 @@ function Shell() {
 
   const openLogin  = (after) => { setLoginAfter(() => after || null); setLoginOpen(true); };
   const closeLogin = () => setLoginOpen(false);
+
+  // 监听全局 'app:openLogin' 事件 —— AdminPage 那边没用 prop 链，只能靠 CustomEvent
+  // （commit 5252634 的 commit message 里说要注册，但实际代码里漏了，运营后台的"用 Privy 登录"点了没反应）
+  useEffect(() => {
+    const handler = (e) => openLogin(e.detail && e.detail.after);
+    window.addEventListener('app:openLogin', handler);
+    return () => window.removeEventListener('app:openLogin', handler);
+  }, []);
   const openForm   = (kind, id, itemTitle) => setFormDef({ kind, id, itemTitle });
   const closeForm  = () => setFormDef(null);
   const openPay    = (courseId) => setPayCourseId(courseId);

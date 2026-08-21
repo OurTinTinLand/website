@@ -30,8 +30,13 @@ export function TopNav({ openLogin }) {
   useEffect(() => { setMenuOpen(false); }, [page]);
 
   const onAuthClick = () => {
-    if (session.logged) go('member');
-    else openLogin(null);
+    if (session.logged) { go('member'); return; }
+    // SDK enabled → 发 app:openPrivyNative，PrivyNativeLauncher 监听后会直接弹 Privy native modal（不走 LoginModal）
+    // SDK disabled → fallback 到 app:openLogin，走 LoginModal → PrivyStandaloneLogin
+    const evt = (window.PRIVY_APP_ID && String(window.PRIVY_APP_ID).trim())
+      ? 'app:openPrivyNative'
+      : 'app:openLogin';
+    window.dispatchEvent(new CustomEvent(evt, { detail: null }));
   };
 
   return (

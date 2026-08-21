@@ -73,6 +73,8 @@ export function PrivyProviderRoot({ children }) {
       }}
     >
       <PrivyCtx.Provider value={{ enabled: true, sdkReady: true, methods: cfg.methods }}>
+        {/* 监听 app:openPrivyNative 事件，点一下"用 Privy 登录"直接弹 Privy native modal（不走 LoginModal） */}
+        <PrivyNativeLauncher />
         {children}
       </PrivyCtx.Provider>
     </PrivyProvider>
@@ -177,4 +179,73 @@ function PrivyButton({ onLogin, onCancel }) {
 // ---- 6. Public helpers ----
 export function getPrivyEnabled() {
   return readPrivyConfig().enabled;
+}
+
+// ---- 6. <PrivyNativeLauncher />（app:openPrivyNative 监听器） ----
+// 设计：AdminPage 的"用 Privy 登录"按钮发 app:openPrivyNative 事件；
+//      这个组件作为监听者被挂在 PrivyProvider 内（只能 enabled=true 时挂），
+//      直接调 useLogin().login() 弹 Privy native modal，零中间步骤。
+//      onComplete 回调里走 PB 桥接 + 刷新页面。
+//      PRIVY_APP_ID 未配置时这个组件不挂载；AdminPage 的按钮 fallback 到 app:openLogin（→ LoginModal）。
+//
+// 注意：必须挂在 PrivyProvider 内才能调 useLogin；所以放在 return <PrivyProvider>...</PrivyProvider> 里。
+function PrivyNativeLauncher() {
+  const { ready, authenticated, getAccessToken } = usePrivy();
+  const { login } = useLogin({
+    onComplete: async ({ user, isNewUser, loginMethod, loginAccount }) => {
+      try {
+        const email   = pickEmail(user);
+        const subject = pickSubject(user);
+        const method  = (loginMethod && String(loginMethod).toLowerCase())
+          || (loginAccount && loginAccount.type)
+          || pickMethod(user)
+          || 'privy';
+        let accessToken = '';
+        try { accessToken = (await getAccessToken()) || ''; } catch (_) {}
+        if (!email) {
+          console.warn('[PrivyNativeLauncher] no email in user; skip bridge');
+          return;
+        }
+        const data = await PB.requestPrivyBridge({
+          email, subject, method, access_token: accessToken,
+        });
+        if (data && data.token && data.record) {
+          // 桥接成功 → 同步到 store
+          const { loginPrivyBridge } = await import('../../state/store.jsx');
+          try { await loginPrivyBridge(data); } catch (_) {}
+          // 通知任何挂载中的 LoginModal 类型回调（detail after 钩子）
+          window.dispatchEvent(new CustomEvent('app:auth:login', { detail: data }));
+          // 简单粗暴刷新（与 AdminPage 之前传的 location.reload() 行为一致）
+          setTimeout(() => location.reload(), 200);
+        }
+      } catch (e) {
+        console.warn('[PrivyNativeLauncher] bridge failed:', e);
+      }
+    },
+    onError: (error) => {
+      console.warn('[PrivyNativeLauncher] login error:', error);
+    },
+  });
+
+  useEffect(() => {
+    const handler = () => {
+      if (!ready) {
+        console.warn('[PrivyNativeLauncher] Privy not ready yet; ignored');
+        return;
+      }
+      if (authenticated) {
+        console.warn('[PrivyNativeLauncher] already authenticated; ignored');
+        return;
+      }
+      try {
+        login();
+      } catch (e) {
+        console.warn('[PrivyNativeLauncher] login() threw:', e);
+      }
+    };
+    window.addEventListener('app:openPrivyNative', handler);
+    return () => window.removeEventListener('app:openPrivyNative', handler);
+  }, [ready, authenticated, login]);
+
+  return null;
 }

@@ -6,7 +6,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useStore, useToast } from '../state/store';
 import * as PB from '../utils/pb-client.js';
+import { useLogin, usePrivy } from '@privy-io/react-auth';
 import { PrivyLoginEntry, usePrivyStatus } from '../components/Auth/PrivyProviderRoot.jsx';
+import { pickEmail, pickSubject, pickMethod } from '../components/Auth/_privy-utils.js';
 
 const ESC = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
@@ -87,10 +89,30 @@ export function LoginModal({ open, afterLogin, onClose }) {
                 <br/>三秒完成 · 零填表 · 不收手机号、不实名、不填职业公司。
               </p>
 
-              {/* 主 CTA — Privy 一键登录（spec §6.4） */}
-              <button className="lm" disabled={pending} onClick={() => setStep('privy')}>
-                Privy 一键登录（OAuth + 钱包）<span className="bg">{privyStatus.enabled ? (privyStatus.sdkReady ? 'SDK' : '加载中') : '离线 fallback'}</span>
-              </button>
+              {/* 主 CTA — Privy 一键登录（spec §6.4）
+                  - SDK enabled → 直接调 useLogin().login()，弹 Privy native modal（官方模式，零中间步骤）
+                  - SDK disabled → 降级到 fallback 多步流（PrivyStandaloneLogin） */}
+              <PrivyMainButton
+                pending={pending}
+                fallbackToStandalone={() => setStep('privy')}
+                onLogin={async (payload) => {
+                  try {
+                    if (payload && payload.token && payload.record) {
+                      await loginPrivyBridge(payload);
+                      const label = LABEL_METHOD(payload.login_method || payload.method);
+                      toast.show(`已用「${label}」登录 · ${payload.email || payload.record.email || ''}`);
+                      onLoginOk(label);
+                    } else if (payload && payload.demo_login) {
+                      await loginPrivyBridge(payload.demo_login);
+                      onLoginOk(LABEL_METHOD(payload.demo_login.login_method));
+                    } else {
+                      toast.show('Privy 桥接响应缺少 token/record（已忽略）');
+                    }
+                  } catch (e) {
+                    toast.show('Privy 桥接失败：' + (e.message || 'unknown'));
+                  }
+                }}
+              />
 
               {/* 离线 fallback：没装 SDK / 没设 APP_ID 时才出现 */}
               {!privyStatus.enabled && (
@@ -173,5 +195,67 @@ export function LoginModal({ open, afterLogin, onClose }) {
         </div>
       </div>
     </div>
+  );
+}
+
+// ---- PrivyMainButton: 一键直接弹 Privy native modal（官方 useLogin 模式） ----
+// 来自 Privy docs 的 UI component 模式：
+//   const { ready, authenticated } = usePrivy();
+//   const { login } = useLogin({ onComplete, onError });
+//   onClick={login} / disabled={!ready || authenticated}
+//
+// 这一层替代 LoginModal 里那个 "step='privy' → <PrivyButton>" 中间步骤。
+// SDK 没装 / 没配 APP_ID 时退到 setStep('privy')，由 PrivyStandaloneLogin 兜底。
+function PrivyMainButton({ pending, fallbackToStandalone, onLogin }) {
+  const status = usePrivyStatus();
+  if (!status.enabled) {
+    // 没装 SDK → 走 fallback step 流程
+    return (
+      <button className="lm" disabled={pending} onClick={fallbackToStandalone}>
+        Privy 一键登录（OAuth + 钱包）<span className="bg">离线 fallback</span>
+      </button>
+    );
+  }
+  return <PrivyDirectLogin pending={pending} onLogin={onLogin} />;
+}
+
+function PrivyDirectLogin({ pending, onLogin }) {
+  const { ready, authenticated, getAccessToken, logout } = usePrivy();
+  const { login } = useLogin({
+    onComplete: async ({ user, loginMethod, loginAccount }) => {
+      try {
+        const email   = pickEmail(user);
+        const subject = pickSubject(user);
+        const method  = (loginMethod && String(loginMethod).toLowerCase())
+          || (loginAccount && loginAccount.type)
+          || pickMethod(user) || 'privy';
+        let accessToken = '';
+        try { accessToken = (await getAccessToken()) || ''; } catch (_) {}
+        if (!email) { console.warn('[PrivyDirectLogin] no email; skip'); return; }
+        const data = await PB.requestPrivyBridge({ email, subject, method, access_token: accessToken });
+        await onLogin({
+          ...data,
+          email:   data.record?.email || email,
+          method:  data.login_method || method,
+          subject: data.subject       || subject,
+        });
+      } catch (e) {
+        console.warn('[PrivyDirectLogin] bridge failed:', e);
+      }
+    },
+    onError: (error) => console.warn('[PrivyDirectLogin] login error:', error),
+  });
+  const disableLogin = !ready || authenticated || pending;
+  return (
+    <>
+      <button className="lm" disabled={disableLogin} onClick={login}>
+        Privy 一键登录（OAuth + 钱包）<span className="bg">{ready ? (authenticated ? '已登录' : 'SDK') : '加载中'}</span>
+      </button>
+      {authenticated && (
+        <div className="wl" style={{ marginTop: 14 }}>
+          <a onClick={() => { try { logout(); } catch (_) {} }}>退出当前 Privy 账户</a>
+        </div>
+      )}
+    </>
   );
 }

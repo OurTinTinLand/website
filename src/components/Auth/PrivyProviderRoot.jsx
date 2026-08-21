@@ -12,14 +12,14 @@
 //   PrivyProviderRoot（顶层组件）
 //     ├─ window.PRIVY_APP_ID 存在  → 包 <PrivyProvider>（来自 @privy-io/react-auth 的静态 import）
 //     │                              ├─ children → 整个 React 应用子树
-//     │                              └─ LoginModal 用 <PrivyLoginEntry /> 触发 usePrivy().login()
+//     │                              └─ LoginModal 直接调 useLogin().login()（v1.2.4 起的官方模式）
 //     └─ window.PRIVY_APP_ID 不在    → children 直通；LoginModal 用 <PrivyStandaloneLogin/> 兜底
 //
 // 运行入口：<PrivyProviderRoot><App/></PrivyProviderRoot>（App.jsx 第 N 行）。
 // 唯一区分点：loginMethods 白名单 + 是否包 <PrivyProvider>。
 // =============================================================================
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
-import { PrivyProvider, usePrivy } from '@privy-io/react-auth';
+import { PrivyProvider, useLogin, usePrivy } from '@privy-io/react-auth';
 import { PrivyStandaloneLogin } from './PrivyStandalone.jsx';
 import { pickEmail, pickSubject, pickMethod } from './_privy-utils.js';
 import * as PB from '../../utils/pb-client.js';
@@ -93,38 +93,54 @@ export function PrivyLoginEntry({ onLogin, onCancel }) {
   return <PrivyStandaloneLogin onLogin={onLogin} onCancel={onCancel} />;
 }
 
-// ---- 5. <PrivyButton />（cfg.enabled=true 路径，里面调 usePrivy） ----
+// ---- 5. <PrivyButton />（cfg.enabled=true 路径，按 Privy 官方 useLogin 模式） ----
+// 官方示例（docs.privy.io/authentication/user-authentication/ui-component）：
+//   import { useLogin, usePrivy } from '@privy-io/react-auth';
+//   const { ready, authenticated } = usePrivy();
+//   const { login } = useLogin({ onComplete, onError });
+//   onClick={login}      ← 直接传，不包 try/catch
+//   disabled = !ready || (ready && authenticated)
+//   onComplete 拿 user / loginMethod / loginAccount 等，替代 useEffect watch authenticated
 function PrivyButton({ onLogin, onCancel }) {
-  const { ready, authenticated, user, getAccessToken, login, logout } = usePrivy();
-
-  // 用户登录后 → 桥接到 PB /api/auth/privy-bridge
-  useEffect(() => {
-    if (!ready || !authenticated || !user) return;
-    (async () => {
+  // 一次解构 usePrivy 全部字段（Rules of Hooks 约束：所有 hooks 调用必须在同一层）
+  const { ready, authenticated, logout, getAccessToken } = usePrivy();
+  // 官方推荐 useLogin()（purpose-built for login flow），带 onComplete / onError 回调
+  const { login } = useLogin({
+    onComplete: async ({ user, isNewUser, loginMethod, loginAccount }) => {
+      // 官方回调：登录成功后走 PB 桥接（替代旧的 useEffect watch authenticated）
       try {
-        const email = pickEmail(user);
+        const email   = pickEmail(user);
         const subject = pickSubject(user);
-        const method = pickMethod(user);
+        // 优先 loginMethod / loginAccount.type（官方 onComplete 给的精确字段），fallback 到 pickMethod
+        const method = (loginMethod && String(loginMethod).toLowerCase())
+          || (loginAccount && loginAccount.type)
+          || pickMethod(user)
+          || 'privy';
         let accessToken = '';
         try { accessToken = (await getAccessToken()) || ''; } catch (_) {}
-        if (!email) return;
+        if (!email) {
+          console.warn('[PrivyButton] no email in user; skip bridge');
+          return;
+        }
         const data = await PB.requestPrivyBridge({
-          email,
-          subject,
-          method,
-          access_token: accessToken,
+          email, subject, method, access_token: accessToken,
         });
         if (onLogin) await onLogin({
           ...data,
-          email: data.record?.email || email,
-          method: data.login_method || method,
-          subject: data.subject || subject,
+          email:   data.record?.email || email,
+          method:  data.login_method || method,
+          subject: data.subject       || subject,
         });
       } catch (e) {
         console.warn('[PrivyButton] bridge failed:', e);
       }
-    })();
-  }, [ready, authenticated, user && user.id]);
+    },
+    onError: (error) => {
+      console.warn('[PrivyButton] login error:', error);
+    },
+  });
+
+  const disableLogin = !ready || (ready && authenticated);
 
   return (
     <div className="privy-sdk-entry">
@@ -136,8 +152,8 @@ function PrivyButton({ onLogin, onCancel }) {
       <button
         type="button"
         className="lm"
-        disabled={!ready}
-        onClick={() => { try { login(); } catch (e) { console.warn(e); } }}
+        disabled={disableLogin}
+        onClick={login}
         style={{ display: 'flex', alignItems: 'center', gap: 12 }}
       >
         <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 22, height: 22 }}>

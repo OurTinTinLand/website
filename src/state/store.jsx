@@ -18,6 +18,13 @@ import { useCatalog } from './catalog.js';
 const StoreCtx = createContext(null);
 const ToastCtx = createContext(null);
 
+// Module-level holder：让 PrivyNativeLauncher（StoreProvider 外部的兄弟节点，
+// 由 PrivyProviderRoot 包出来）也能调到 loginPrivyBridge。直接 dynamic import
+// store.jsx 取不到它 —— loginPrivyBridge 是 StoreProvider 函数体里的局部 const，
+// 不是模块顶层 export。StoreProvider render 期间会同步挂上来。
+let _loginPrivyBridge = null;
+export function getLoginPrivyBridge() { return _loginPrivyBridge; }
+
 // ===== spec §14.6 · role 模型 =====
 // 5 个角色（与 backend/pb_migrations/1755000060_add_role_to_user_profiles.js 对齐）：
 //
@@ -190,6 +197,11 @@ export function StoreProvider({ children }) {
     } catch (_) {}
     return payload;
   }, []);
+
+  // 同步把内部 setter 挂到 module-level holder，让 PrivyNativeLauncher
+  // （StoreProvider 外部的兄弟节点）能调到。render 期间同步赋值（赋值 setter
+  // 引用不引入 side-effect，类似 Context.Provider value 模式）。
+  _loginPrivyBridge = loginPrivyBridge;
 
   const logout = useCallback(() => {
     // [AUTH-DEBUG] 临时埋点 — 调试完删

@@ -115,7 +115,15 @@ function PrivyNativeLauncher() {
       // [AUTH-DEBUG] 临时埋点 — 调试完删
       try { console.warn('[AUTH-DEBUG] runPrivyBridge bridge returned', { ok: data && data.ok, hasToken: !!(data && data.token), hasRecord: !!(data && data.record), role: data && data.role, errField: data && (data.error || data.message) }); } catch (_) {}
       if (data && data.token && data.record) {
-        const { loginPrivyBridge } = await import('../../state/store.jsx');
+        // loginPrivyBridge 是 StoreProvider 里的局部 const，不是模块 export。
+        // StoreProvider render 期间会同步挂到 module-level holder，
+        // 这里通过 getter 取，避免 dynamic import 拿到 undefined。
+        const { getLoginPrivyBridge } = await import('../../state/store.jsx');
+        const loginPrivyBridge = getLoginPrivyBridge();
+        if (typeof loginPrivyBridge !== 'function') {
+          console.warn('[PrivyNativeLauncher] loginPrivyBridge not registered yet (StoreProvider not mounted?)');
+          return false;
+        }
         try { await loginPrivyBridge(data); console.warn('[AUTH-DEBUG] loginPrivyBridge resolved'); } catch (e) { console.warn('[AUTH-DEBUG] loginPrivyBridge threw', e && e.message); }
         // 同步 flush session 到 localStorage（saveState 有 500ms debounce，
         // 如果不等 flush 就 reload，新 session 没写出去 → reload 后看起来未登录）

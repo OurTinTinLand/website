@@ -20,7 +20,7 @@
 // 运行入口：<PrivyProviderRoot><App/></PrivyProviderRoot>（App.jsx）。
 // 唯一区分点：loginMethods 白名单 + 是否包 <PrivyProvider>。
 // =============================================================================
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef, useCallback } from 'react';
 import { PrivyProvider, useLogin, usePrivy } from '@privy-io/react-auth';
 import { pickEmail, pickSubject, pickMethod } from './_privy-utils.js';
 import * as PB from '../../utils/pb-client.js';
@@ -80,67 +80,99 @@ export function PrivyProviderRoot({ children }) {
 //
 // 注意：必须挂在 PrivyProvider 内才能调 useLogin；所以放在 return <PrivyProvider>...</PrivyProvider> 里。
 function PrivyNativeLauncher() {
-  const { ready, authenticated, getAccessToken, logout } = usePrivy();
+  const { ready, authenticated, user, getAccessToken, logout } = usePrivy();
   // pendingAfter：调用方传入的 after 回调（如 () => openPay(courseId)）。
   // 注意：调用方不要再传硬刷页面的回调 —— setSession 已经把新 role/logged 同步
   // 进了 React state，AdminPage 等会自然 re-render；硬刷会和 saveState debounce /
   // Privy rehydration 互相冲掉，导致登录后页面回到旧 role / 反复弹 LoginPrompt。
   let pendingAfter = null;
+  // 防止同一登录态被桥接两次：onComplete（fresh login）和下面的 authenticated
+  // watcher（cookie rehydration）都可能触发；bridgingRef 串行化保证只跑一次。
+  const bridgingRef = useRef(false);
+
+  // Bridge helper：从 Privy user 拉 PB token，写进 store + localStorage + 派 app:auth:login。
+  // 同时被 onComplete（fresh login 路径）和下面 bridge-on-auth watcher（cookie rehydrate /
+  // onComplete 未派发的兜底路径）调用；bridgingRef 串行化保证只跑一次。
+  const runPrivyBridge = useCallback(async () => {
+    if (bridgingRef.current) return false;
+    if (!user) return false;
+    bridgingRef.current = true;
+    try {
+      const email   = pickEmail(user);
+      const subject = pickSubject(user);
+      const method  = pickMethod(user) || 'privy';
+      if (!email) {
+        console.warn('[PrivyNativeLauncher] no email in user; skip bridge');
+        return false;
+      }
+      let accessToken = '';
+      try { accessToken = (await getAccessToken()) || ''; } catch (_) {}
+      // [AUTH-DEBUG] 临时埋点 — 调试完删
+      try { console.warn('[AUTH-DEBUG] runPrivyBridge start', { email, subject, method, hasAccessToken: !!accessToken }); } catch (_) {}
+      const data = await PB.requestPrivyBridge({
+        email, subject, method, access_token: accessToken,
+      });
+      // [AUTH-DEBUG] 临时埋点 — 调试完删
+      try { console.warn('[AUTH-DEBUG] runPrivyBridge bridge returned', { ok: data && data.ok, hasToken: !!(data && data.token), hasRecord: !!(data && data.record), role: data && data.role, errField: data && (data.error || data.message) }); } catch (_) {}
+      if (data && data.token && data.record) {
+        const { loginPrivyBridge } = await import('../../state/store.jsx');
+        try { await loginPrivyBridge(data); console.warn('[AUTH-DEBUG] loginPrivyBridge resolved'); } catch (e) { console.warn('[AUTH-DEBUG] loginPrivyBridge threw', e && e.message); }
+        // 同步 flush session 到 localStorage（saveState 有 500ms debounce，
+        // 如果不等 flush 就 reload，新 session 没写出去 → reload 后看起来未登录）
+        try {
+          const persist = await import('../../state/persist.js');
+          persist.flushState('session');
+          console.warn('[AUTH-DEBUG] flushState(session) done');
+        } catch (_) {}
+        window.dispatchEvent(new CustomEvent('app:auth:login', { detail: data }));
+        console.warn('[AUTH-DEBUG] dispatched app:auth:login');
+        return true;
+      }
+      return false;
+    } catch (e) {
+      console.warn('[PrivyNativeLauncher] bridge failed:', e);
+      return false;
+    } finally {
+      bridgingRef.current = false;
+    }
+  }, [user, getAccessToken]);
 
   const { login } = useLogin({
-    onComplete: async ({ user, isNewUser, loginMethod, loginAccount }) => {
-      try {
-        const email   = pickEmail(user);
-        const subject = pickSubject(user);
-        const method  = (loginMethod && String(loginMethod).toLowerCase())
-          || (loginAccount && loginAccount.type)
-          || pickMethod(user)
-          || 'privy';
-        let accessToken = '';
-        try { accessToken = (await getAccessToken()) || ''; } catch (_) {}
-        // [AUTH-DEBUG] 临时埋点 — 调试完删
-        try { console.warn('[AUTH-DEBUG] onComplete start', { email, subject, method, hasAccessToken: !!accessToken, isNewUser }); } catch (_) {}
-        if (!email) {
-          console.warn('[PrivyNativeLauncher] no email in user; skip bridge');
-          return;
-        }
-        const data = await PB.requestPrivyBridge({
-          email, subject, method, access_token: accessToken,
-        });
-        // [AUTH-DEBUG] 临时埋点 — 调试完删
-        try { console.warn('[AUTH-DEBUG] requestPrivyBridge returned', { ok: data && data.ok, hasToken: !!(data && data.token), hasRecord: !!(data && data.record), role: data && data.role, errField: data && (data.error || data.message) }); } catch (_) {}
-        if (data && data.token && data.record) {
-          const { loginPrivyBridge } = await import('../../state/store.jsx');
-          try { await loginPrivyBridge(data); console.warn('[AUTH-DEBUG] loginPrivyBridge resolved'); } catch (e) { console.warn('[AUTH-DEBUG] loginPrivyBridge threw', e && e.message); }
-          // 同步 flush session 到 localStorage（saveState 有 500ms debounce，
-          // 如果不等 flush 就 reload，新 session 没写出去 → reload 后看起来未登录
-          // → 触发再登录 → 死循环）
-          try {
-            const persist = await import('../../state/persist.js');
-            persist.flushState('session');
-            console.warn('[AUTH-DEBUG] flushState(session) done');
-          } catch (_) {}
-          window.dispatchEvent(new CustomEvent('app:auth:login', { detail: data }));
-          console.warn('[AUTH-DEBUG] dispatched app:auth:login');
-
-          // after 才是"调用方登录后想做的事"（DetailModal 走 openPay(courseId)
-          // 等）；它本身就是调用方选的更新策略，我们不再叠加任何自动 reload。
-          // 调用方传 null 就什么都不做 —— 默认路径是 AdminPage，session 已经
-          // 通过 setSession 同步更新进 React state，UI 会自然 re-render。
-          const after = pendingAfter;
-          pendingAfter = null;
-          if (typeof after === 'function') {
-            try { await after(); } catch (e) { console.warn('[PrivyNativeLauncher] after() failed:', e); }
-          }
-        }
-      } catch (e) {
-        console.warn('[PrivyNativeLauncher] bridge failed:', e);
+    onComplete: async ({ isNewUser, loginMethod, loginAccount }) => {
+      // fresh login 路径。bridge 实际上由 bridge-on-auth watcher 兜底（它覆盖
+      // fresh login / cookie rehydrate / onComplete 未派发 三种情况）。
+      // 这里只 await 一下，确保 pendingAfter 在 session 落地之后再触发；
+      // bridgingRef 防止双重调用。
+      try { await runPrivyBridge(); } catch (_) {}
+      // after 是"调用方登录后想做的事"（DetailModal 走 openPay(courseId) 等）；
+      // 它本身就是调用方选的更新策略，我们不再叠加任何自动 reload。
+      // 调用方传 null 就什么都不做 —— 默认路径是 AdminPage，session 已经
+      // 通过 setSession 同步更新进 React state，UI 会自然 re-render。
+      const after = pendingAfter;
+      pendingAfter = null;
+      if (typeof after === 'function') {
+        try { await after(); } catch (e) { console.warn('[PrivyNativeLauncher] after() failed:', e); }
       }
     },
     onError: (error) => {
       console.warn('[PrivyNativeLauncher] login error:', error);
     },
   });
+
+  // —— bridge-on-auth watcher ——
+  // Privy authenticated 一变 true 就检查 PB：未登录就调 bridge。
+  // 这是 onComplete 之外唯一的桥接触发点，专门覆盖：
+  //   1) Privy cookie rehydrate（onComplete 不会派）
+  //   2) onComplete 因为其他原因未派发
+  // 不 watch user 单独变化 —— user 是 authenticated 的派生量；deps 含 authenticated 就够。
+  // bridgingRef 防止 onComplete 路径同时触发时双跑。
+  useEffect(() => {
+    if (!ready || !authenticated || !user) return;
+    if (PB.isLoggedIn()) return;
+    // [AUTH-DEBUG] 临时埋点 — 调试完删
+    try { console.warn('[AUTH-DEBUG] bridge-on-auth watch fires', { pbLoggedIn: PB.isLoggedIn() }); } catch (_) {}
+    runPrivyBridge().catch((e) => console.warn('[PrivyNativeLauncher] bridge-on-auth failed:', e));
+  }, [ready, authenticated, user, runPrivyBridge]);
 
   useEffect(() => {
     const handler = async (e) => {

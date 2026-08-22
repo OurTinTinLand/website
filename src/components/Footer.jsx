@@ -1,10 +1,11 @@
 // 页脚：业务 / 公司 / 社群 + 暗黑背景
 import React from 'react';
 import { useRoute } from '../utils/router';
-import { useToast } from '../state/store';
+import { useStore, useToast } from '../state/store';
 
 export function Footer() {
   const { go } = useRoute();
+  const { session, canAccessAdmin } = useStore();
   const toast = useToast();
   return (
     <footer className="ft">
@@ -28,7 +29,9 @@ export function Footer() {
             <a onClick={() => go('about')}>关于</a>
             <a onClick={() => go('jobs')}>加入我们</a>
             <a onClick={() => go('enterprise')}>企业服务</a>
-            <a onClick={() => go('admin')}>运营后台</a>
+            {canAccessAdmin(session) && (
+              <a onClick={() => go('admin')}>运营后台</a>
+            )}
           </div>
           <div>
             <h4>社群</h4>

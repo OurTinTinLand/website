@@ -53,7 +53,9 @@ export function TopNav({ openLogin }) {
         </div>
         <div className="nav-r">
           <button className="btn btn-line btn-sm lang" onClick={() => toast.show('i18n 留到 V1.1')}>EN</button>
-          <button className="btn btn-line btn-sm" id="navAdmin" onClick={() => go('admin')}>运营后台</button>
+          {canAccessAdmin(session) && (
+            <button className="btn btn-line btn-sm" id="navAdmin" onClick={() => go('admin')}>运营后台</button>
+          )}
           <button className="btn btn-fill btn-sm" id="navAuth" onClick={onAuthClick}>
             {session.logged
               ? (canAccessAdmin(session) ? `我的 · ${ROLE_SHORT[session.role] || '运营'}` : '我的')

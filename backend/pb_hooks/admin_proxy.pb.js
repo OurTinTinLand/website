@@ -205,11 +205,15 @@ routerAdd("POST", "/api/admin/proxy", function(e) {
         throw new BadRequestError(method + " 必须传 id");
     }
 
-    // $http.send 需要绝对 URL
+    // $http.send 需要绝对 URL；与本文件 superuser-token handler 同一份逻辑。
+    // 优先 PB_ADMIN_AUTH_URL（生产 / 反代场景显式配置），否则用 Railway 注入的 PORT，
+    // 再否则 PB_PORT，最后回落到 8090。这一行跟 start.sh 里
+    // `pocketbase serve --http=0.0.0.0:${PORT}` 必须保持一致，否则 goja 内发的
+    // 回环 HTTP 走不到 PB 自己。
     var baseUrl = $os.getenv("PB_ADMIN_AUTH_URL") || "";
     if (!baseUrl) {
         var pbHost = $os.getenv("PB_HOST") || "127.0.0.1";
-        var pbPort = $os.getenv("PB_PORT") || "8090";
+        var pbPort = $os.getenv("PORT") || $os.getenv("PB_PORT") || "8090";
         baseUrl = "http://" + pbHost + ":" + pbPort;
     }
     var pth = "/api/collections/" + encodeURIComponent(col) + "/records" +

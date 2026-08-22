@@ -178,7 +178,15 @@ fi
 #                                  注：window.PRIVY_* 已在第 1.6 步注入到 index.html
 #   --hooksDir=/pb/hooks        业务钩子（auth/admin_proxy/ai_route/...），不再负责 secret 注入
 #   --migrationsDir=/pb/migrations  spec v1.1 schema
-echo "[start.sh] starting PocketBase on :${PORT} (origins=${PB_ORIGINS})"
+# 1.7) 暴露给 hook 的回环地址 —— superuser-token / admin_proxy 这两个 handler
+#      会用 $http.send 回调 PB 自己拿 superuser token / 代发 collection CRUD。
+#      必须在 PB 启动前 export，否则 hook handler 读不到。允许用户用
+#      PB_ADMIN_AUTH_URL 显式覆盖（反代 / 非 localhost 场景）。
+if [ -z "${PB_ADMIN_AUTH_URL:-}" ]; then
+    export PB_ADMIN_AUTH_URL="http://127.0.0.1:${PORT}"
+fi
+
+echo "[start.sh] starting PocketBase on :${PORT} (origins=${PB_ORIGINS}, admin auth url=${PB_ADMIN_AUTH_URL})"
 exec /pb/pocketbase serve \
     --http=0.0.0.0:${PORT} \
     --dir="${PB_DATA_DIR}" \

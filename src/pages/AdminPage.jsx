@@ -56,11 +56,11 @@ export function AdminPage({ openLogin }) {
         {!session.logged && (
           <LoginPrompt onLogin={() => {
             // 统一入口：openLogin 按 PRIVY_APP_ID 自动分发。
-            // 不要传 location.reload —— setSession 已经在 React 端同步更新了 role/logged，
-            // AdminPage 会自然 re-render；硬刷一次反而容易和 Privy rehydration / saveState debounce
-            // 互相冲掉，把 session 留在旧 localStorage 上、admin 页面反复弹 LoginPrompt。
-            // 这里传 null 让 PrivyNativeLauncher 走"无 after"路径；如果一定要更新一次
-            // 服务端数据，调用 reloadCatalog()（不会触发页面刷新）。
+            // 不要传任何触发页面硬刷的回调 —— setSession 已经在 React 端同步更新了
+            // role/logged，AdminPage 会自然 re-render；硬刷反而容易和 Privy
+            // rehydration / saveState debounce 互相冲掉，把 session 留在旧 localStorage
+            // 上、admin 页面反复弹 LoginPrompt。这里传 null 走"无 after"路径；
+            // 如果一定要更新一次服务端数据，调用 reloadCatalog()（不会触发页面刷新）。
             openLogin(null);
           }} />
         )}

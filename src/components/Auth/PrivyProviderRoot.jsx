@@ -75,6 +75,8 @@ export function PrivyProviderRoot({ children }) {
       <PrivyCtx.Provider value={{ enabled: true, sdkReady: true, methods: cfg.methods }}>
         {/* 监听 app:openPrivyNative 事件，点一下"用 Privy 登录"直接弹 Privy native modal（不走 LoginModal） */}
         <PrivyNativeLauncher />
+        {/* 把 PB / Privy 两个 session 源同步起来。详见函数注释。 */}
+        <PrivyAuthSync />
         {children}
       </PrivyCtx.Provider>
     </PrivyProvider>
@@ -190,10 +192,10 @@ export function getPrivyEnabled() {
 //
 // 注意：必须挂在 PrivyProvider 内才能调 useLogin；所以放在 return <PrivyProvider>...</PrivyProvider> 里。
 function PrivyNativeLauncher() {
-  const { ready, authenticated, getAccessToken } = usePrivy();
+  const { ready, authenticated, getAccessToken, logout } = usePrivy();
   // pendingAfter：调用方传入的 after 回调（如 () => openPay(courseId)）。
-  // 注意：调用方不要再传 () => location.reload() —— setSession 已经把新 role/logged
-  // 同步进了 React state，AdminPage 等会自然 re-render；硬刷会和 saveState debounce /
+  // 注意：调用方不要再传硬刷页面的回调 —— setSession 已经把新 role/logged 同步
+  // 进了 React state，AdminPage 等会自然 re-render；硬刷会和 saveState debounce /
   // Privy rehydration 互相冲掉，导致登录后页面回到旧 role / 反复弹 LoginPrompt。
   let pendingAfter = null;
 
@@ -254,13 +256,19 @@ function PrivyNativeLauncher() {
         return;
       }
       if (authenticated) {
-        // 已经登录 —— 不弹 Privy modal，更不盲目跑 after()。
-        // 历史 bug：AdminPage 把 after 当成 location.reload() 来用，已登录时点"用 Privy 登录"
-        // 会让这里执行 reload → 状态不变 → 同帧再点 → 同帧 reload → 体感"页面循环重启"。
-        // 解决：清掉 pendingAfter；不再调 login() / after()。
-        console.warn('[PrivyNativeLauncher] already authenticated; skip');
-        pendingAfter = null;
-        return;
+        // 防 desync：PB 才是真正权威。Privy SDK 自己有 cookie/localStorage 续命，
+        // 哪怕 PB.logout() 把 token 清掉，Privy 那边的 authenticated 还是会 true，
+        // reload 之后还会从 cookie 复活 —— 这时点登录按钮就会被这一行无声 skip 掉。
+        // PB 没登录就走不到"已经登录"路径；强制 Privy logout 后继续往下，让用户
+        // 能正常登另一个号。
+        if (PB.isLoggedIn()) {
+          console.warn('[PrivyNativeLauncher] already authenticated; skip');
+          pendingAfter = null;
+          return;
+        }
+        console.warn('[PrivyNativeLauncher] Privy stale-auth, PB logged out — forcing Privy logout');
+        try { logout(); } catch (_) {}
+        // 不 return —— 让下面的 login() 继续跑，弹出 modal 让用户登新号
       }
       try {
         login();
@@ -270,7 +278,44 @@ function PrivyNativeLauncher() {
     };
     window.addEventListener('app:openPrivyNative', handler);
     return () => window.removeEventListener('app:openPrivyNative', handler);
-  }, [ready, authenticated, login]);
+  }, [ready, authenticated, login, logout]);
+
+  return null;
+}
+
+// ---- 7. <PrivyAuthSync />：PB 与 Privy 两套 session 之间的桥 ----
+//
+// 历史：logout() 之前只调 PB.logout()，没碰 Privy SDK。结果 Privy SDK 还凭着自己的
+// cookie/localStorage 继续认为用户已登录（即使 PB token 已经被清掉）。reload 后
+// 还会从 cookie 复活 —— 这种情况点 "登录" 按钮，PrivyNativeLauncher 走
+// "already authenticated; skip" 分支，Privy modal 不弹，用户以为被卡死。
+//
+// 这个组件做两件事：
+//   1) 监听 StoreProvider.logout() 派发的 'app:auth:logout' 事件，
+//      调 usePrivy().logout() 同步清掉 Privy。
+//   2) 页面 mount / Privy 状态变化时，检查 "Privy 认为登录，但 PB 没 token" 这种
+//      desync；命中就强制 logout()，让 PrivyNativeLauncher 下次能正常弹 modal。
+//      （处理 reload 后从 cookie 复活 + PB 已登出的情况。）
+//
+// 只能挂在 PrivyProvider 内（要用 usePrivy）。
+function PrivyAuthSync() {
+  const { authenticated, logout } = usePrivy();
+
+  // (1) 监听 StoreProvider 的显式 logout
+  useEffect(() => {
+    const handler = () => {
+      try { logout(); } catch (_) {}
+    };
+    window.addEventListener('app:auth:logout', handler);
+    return () => window.removeEventListener('app:auth:logout', handler);
+  }, [logout]);
+
+  // (2) mount + 每次 Privy authenticated 变化：检查 desync
+  useEffect(() => {
+    if (authenticated && !PB.isLoggedIn()) {
+      try { logout(); } catch (_) {}
+    }
+  }, [authenticated, logout]);
 
   return null;
 }

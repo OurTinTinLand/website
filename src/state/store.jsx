@@ -189,6 +189,11 @@ export function StoreProvider({ children }) {
     PB.logout();
     setSession({ logged: false, is_admin: false, role: 'member', method: '', user_id: '', email: '', profile: emptyProfile() });
     setMySignups([]);
+    // 同步清掉 Privy session。StoreProvider 在 PrivyProvider 外层，没法直接调
+    // usePrivy().logout()；改成派事件，由挂在内层的 PrivyLogoutBridge 接住去调。
+    // 不清会导致：logout 后点 TopNav "登录" → PrivyNativeLauncher 看到
+    // authenticated=true 走 skip 分支，Privy modal 不弹，用户以为自己被卡死。
+    try { window.dispatchEvent(new CustomEvent('app:auth:logout')); } catch (_) {}
   }, []);
 
 // demoAdmin() 删除 — v1.2 前端的运营身份必须走后端 role 解析；

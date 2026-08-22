@@ -223,3 +223,56 @@ v1.2 后期修复：把整包（bundle + react + @privy-io/react-auth 等）切�
 - Privy 内部模块：`esm.sh/@privy-io/react-auth` 反吐的 shim 走路径绝对（`/react@^18 || ^19/...` 等），不需要 importmap 中转
 - 两边都指向同一份 esm.sh React，浏览器视为同一 module 引用，dispatcher / context 共享
 
+
+---
+
+## 4. v1.2 升级：users.privy_subject 字段 + Privy ↔ PB 1:1 映射
+
+> 这一节是 spec §6.4 在 v1.2 的一次演进。修订日期 2026-08-22。
+
+### 4.1 为什么不用 Privy subject 当 PB users.id
+
+最直接的想法："Privy 用户登录后，把 Privy 的 subject（形如 `did:privy:cm1abc23def...`）当成 PB users.id"。**这条路在 PB 0.39 上走不通**，原因如下：
+
+| 约束 | 值 | 来源 |
+|---|---|---|
+|  `users.id` field pattern | `^[a-z0-9]+$`（只允许小写字母+数字） | `_collections` 表 `users` schema JSON |
+|  `users.id` min / max | 15 / 15（恰好 15 字符） | 同上 |
+|  默认 id 字符集 | `abcdefghijklmnopqrstuvwxyz0123456789`（无 `_` 无大写） | `core/db.go:DefaultIdAlphabet` |
+
+Privy subject `did:privy:cm1abc23def...` 既含 `:` 也超 15 字符，更别说还有大小写——直接违反 auth collection 的字段约束。
+
+更糟的是：**PB 0.39 在 auth collection 上自定义 id 失败时会静默吞掉错误**（POST 返回 200、record 不入库）。已实测确认（参见 `scripts/test-privy-bridge.mjs` 早期 commit）。
+
+### 4.2 正确做法
+
+PB `users.id` **继续由 PB 自动生成**（合规的 15 字符小写字母+数字），Privy subject 单独存到 **`users.privy_subject`** 字段（v1.2 新增）。这套设计：
+
+- ✅ PB auth collection 的 id 约束不被破坏
+- ✅ Privy subject 与 PB user 1:1 映射（带 UNIQUE 索引）
+- ✅ 跨设备登录：同一 subject（同一 Privy 钱包/邮箱）→ 同一个 PB user
+- ✅ 邮箱变了也能找到老用户：先查 `privy_subject`，再 fallback 到 email
+- ✅ 前端拿到 PB token 后可通过 `users.privy_subject` 反查 Privy 身份
+
+### 4.3 实现
+
+**Migration**：`backend/pb_migrations/1755000070_add_privy_subject.js`
+- 在 users 集合上新增 `privy_subject` 字段（text, max=200, optional, non-system）
+- 加 `CREATE UNIQUE INDEX idx_privy_subject ON users (privy_subject) WHERE privy_subject != ''`（部分索引，让空值不参与唯一性约束）
+
+**Hook**：`backend/pb_hooks/auth.pb.js`（`POST /api/auth/privy-bridge`）
+- `findUserByPrivySubject(subject)` — 通过 subject 查 PB 用户
+- `createUser(email, privySubject)` — 新建用户时把 subject 写进 `privy_subject` 字段
+- 查找顺序：`privy_subject` > `email` > 新建（向后兼容，老 email-only 用户不受影响）
+
+**测试**：`scripts/test-privy-bridge.mjs`
+- 单元：(A) 字段格式合法性
+- 端到端：(B) 首次创建、(C) 同 subject 重入幂等、(D) `privy_subject` 字段被填充、(E) 同 subject 不同 email 复用同用户
+
+```bash
+# 单元测试（无需 PB）
+node scripts/test-privy-bridge.mjs
+
+# 端到端（需 PB 在跑）
+node scripts/test-privy-bridge.mjs e2e
+```

@@ -399,7 +399,15 @@ routerAdd("POST", "/api/auth/privy-bridge", function(e) {
         try { return JSON.parse(raw); } catch (_) { return {}; }
     }
 
-    // ── inline helper：找用户（与 email-OTP 共用同款查找策略，避免 OR username 解析失败）──
+    // ── inline helpers ──────────────────────────────────────────────
+    // PB auth collection (users) 的 id 字段 schema 强约束：pattern=^[a-z0-9]+$, min=max=15
+    // （参见 _collections 表里 users 的 schema JSON）。也就是说 PB 的 auth collection
+    // 不接受 Privy subject 直接做 id（subject 形如 'did:privy:cm1abc23def...'，含冒号、
+    // 大写、远超 15 字符），且早期尝试自定义 id（含 underscore）会被静默吞掉（save 返回
+    // success 但 record 不入库）。正确做法：
+    //   - PB users.id 仍由 PB 自动生成（15 字符小写字母+数字）
+    //   - Privy subject 存到 users.privy_subject 字段（migration: 1755000070_add_privy_subject）
+    //   - 通过该字段做 1:1 映射（带索引），可确定性反查
     function findUserByEmail(email) {
         try {
             return $app.findFirstRecordByFilter("users",
@@ -407,7 +415,16 @@ routerAdd("POST", "/api/auth/privy-bridge", function(e) {
         } catch (_) {}
         return null;
     }
-    function createUser(email) {
+    // 通过 privy_subject 查（同 subject → 同一 PB 用户，即便 email 变了）
+    function findUserByPrivySubject(subject) {
+        try {
+            if (!subject) return null;
+            return $app.findFirstRecordByFilter("users",
+                "privy_subject = {:s}", { s: String(subject) });
+        } catch (_) {}
+        return null;
+    }
+    function createUser(email, privySubject) {
         var usersCol = $app.findCollectionByNameOrId("users");
         var u = new Record(usersCol);
         u.set("email", email);
@@ -416,6 +433,10 @@ routerAdd("POST", "/api/auth/privy-bridge", function(e) {
             "abcdefghijklmnopqrstuvwxyz0123456789"));
         u.set("verified", false);
         u.set("emailVisibility", false);
+        if (privySubject) {
+            // 字段不存在（migration 没跑）→ try/catch 静默忽略；migration 后会后补
+            try { u.set("privy_subject", String(privySubject)); } catch (_) {}
+        }
         $app.save(u);
         return u;
     }
@@ -534,8 +555,10 @@ routerAdd("POST", "/api/auth/privy-bridge", function(e) {
     if (!rl.ok) throw new TooManyRequestsError("请求过于频繁，请稍后再试", rl);
 
     // 找/创用户（key = email；首次 → 自动建）
-    var user = findUserByEmail(email);
-    if (!user) user = createUser(email);
+    // 找用户顺序：privy_subject > email（同 email 优先向后兼容；subject 1:1 跨设备）
+    var user = findUserByPrivySubject(subject);
+    if (!user) user = findUserByEmail(email);
+    if (!user) user = createUser(email, subject);
 
     // 同步 user_profiles（拿到返回值 → 给 resolveRole 用）
     var profile = ensureProfile(user, email, method);

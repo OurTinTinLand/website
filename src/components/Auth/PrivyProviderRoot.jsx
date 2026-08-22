@@ -191,8 +191,10 @@ export function getPrivyEnabled() {
 // 注意：必须挂在 PrivyProvider 内才能调 useLogin；所以放在 return <PrivyProvider>...</PrivyProvider> 里。
 function PrivyNativeLauncher() {
   const { ready, authenticated, getAccessToken } = usePrivy();
-  // pendingAfter：调用方传入的 after 回调（如 () => location.reload() / () => openPay(courseId)）
-  // onComplete 跑完 PB 桥接后再调，确保"登录完成后要做什么"的钩子被执行
+  // pendingAfter：调用方传入的 after 回调（如 () => openPay(courseId)）。
+  // 注意：调用方不要再传 () => location.reload() —— setSession 已经把新 role/logged
+  // 同步进了 React state，AdminPage 等会自然 re-render；硬刷会和 saveState debounce /
+  // Privy rehydration 互相冲掉，导致登录后页面回到旧 role / 反复弹 LoginPrompt。
   let pendingAfter = null;
 
   const { login } = useLogin({
@@ -225,12 +227,10 @@ function PrivyNativeLauncher() {
           } catch (_) {}
           window.dispatchEvent(new CustomEvent('app:auth:login', { detail: data }));
 
-          // after 才是"调用方登录后想做的事"（AdminPage 走 location.reload()，
-          // DetailModal 走 openPay(courseId) 等）；它本身就是调用方选的更新策略，
-          // 我们不再叠加 setTimeout(reload, 200) —— 否则两层 reload 互相冲掉
-          // （浏览器正在卸载时 flush 写盘 + 第二次 reload），而且对不带 after 的
-          // 调用方这个 200ms 兜底 reload 会强制硬刷一次，用户体感就是"登录完页面
-          // 不停跳转"。
+          // after 才是"调用方登录后想做的事"（DetailModal 走 openPay(courseId)
+          // 等）；它本身就是调用方选的更新策略，我们不再叠加任何自动 reload。
+          // 调用方传 null 就什么都不做 —— 默认路径是 AdminPage，session 已经
+          // 通过 setSession 同步更新进 React state，UI 会自然 re-render。
           const after = pendingAfter;
           pendingAfter = null;
           if (typeof after === 'function') {

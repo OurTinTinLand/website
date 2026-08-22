@@ -149,8 +149,15 @@ export function StoreProvider({ children }) {
     };
     const methodLabel = labelByMethod[method] || 'Privy';
     // 角色（spec §14.6）：server 解析后塞进来；缺省 member。
-    const role = (payload.role && ROLES.indexOf(payload.role) !== -1) ? payload.role : 'member';
-    setSession({
+    // 向后兼容：v1.2 之前的 DB 里有人手动写过 role='admin'（PB schema 当时还没 select 约束），
+    // 那种记录现在仍可能在 PB 里被返回。前端当作 'super_admin' 处理就行 —— DB 侧
+    // 建议在后台 UI 里改回 'super_admin'，但前端不能因为字符串不匹配就降级到 'member'
+    // 把运营挡在门外。
+    const ALIAS = { admin: 'super_admin' };
+    const rawRole = payload.role || '';
+    const aliased = ALIAS[rawRole] || rawRole;
+    const role = (aliased && ROLES.indexOf(aliased) !== -1) ? aliased : 'member';
+    const nextSession = {
       logged: true,
       // 旧字段保留（前端其它地方可能仍读 is_admin）；
       // 新代码应该读 role 与 canAccessAdmin(session)。
@@ -166,7 +173,15 @@ export function StoreProvider({ children }) {
         : emptyProfile(),
       // 内部小标记：哪些 method 走过（方便后续风控 / 招聘板块判断）
       privy: { subject: payload.subject || '', strict: !!payload.strict, method, role },
-    });
+    };
+    setSession(nextSession);
+    // 同步把新 session 写到 localStorage。saveState 自带 500ms debounce，
+    // 调用方（PrivyNativeLauncher）会再 flushState 一次。这里先 saveState 是
+    // 为了兜住"调用方忘了 flush"的场景（LoginModal 的几条老路径），以及
+    // 让"组件卸载前 + reload"之间多一次保险。
+    try {
+      saveState('session', nextSession);
+    } catch (_) {}
     return payload;
   }, []);
 

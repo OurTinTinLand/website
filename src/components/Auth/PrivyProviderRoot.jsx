@@ -98,6 +98,8 @@ function PrivyNativeLauncher() {
           || 'privy';
         let accessToken = '';
         try { accessToken = (await getAccessToken()) || ''; } catch (_) {}
+        // [AUTH-DEBUG] 临时埋点 — 调试完删
+        try { console.warn('[AUTH-DEBUG] onComplete start', { email, subject, method, hasAccessToken: !!accessToken, isNewUser }); } catch (_) {}
         if (!email) {
           console.warn('[PrivyNativeLauncher] no email in user; skip bridge');
           return;
@@ -105,17 +107,21 @@ function PrivyNativeLauncher() {
         const data = await PB.requestPrivyBridge({
           email, subject, method, access_token: accessToken,
         });
+        // [AUTH-DEBUG] 临时埋点 — 调试完删
+        try { console.warn('[AUTH-DEBUG] requestPrivyBridge returned', { ok: data && data.ok, hasToken: !!(data && data.token), hasRecord: !!(data && data.record), role: data && data.role, errField: data && (data.error || data.message) }); } catch (_) {}
         if (data && data.token && data.record) {
           const { loginPrivyBridge } = await import('../../state/store.jsx');
-          try { await loginPrivyBridge(data); } catch (_) {}
+          try { await loginPrivyBridge(data); console.warn('[AUTH-DEBUG] loginPrivyBridge resolved'); } catch (e) { console.warn('[AUTH-DEBUG] loginPrivyBridge threw', e && e.message); }
           // 同步 flush session 到 localStorage（saveState 有 500ms debounce，
           // 如果不等 flush 就 reload，新 session 没写出去 → reload 后看起来未登录
           // → 触发再登录 → 死循环）
           try {
             const persist = await import('../../state/persist.js');
             persist.flushState('session');
+            console.warn('[AUTH-DEBUG] flushState(session) done');
           } catch (_) {}
           window.dispatchEvent(new CustomEvent('app:auth:login', { detail: data }));
+          console.warn('[AUTH-DEBUG] dispatched app:auth:login');
 
           // after 才是"调用方登录后想做的事"（DetailModal 走 openPay(courseId)
           // 等）；它本身就是调用方选的更新策略，我们不再叠加任何自动 reload。
@@ -170,6 +176,8 @@ function PrivyNativeLauncher() {
           // 下会看到 passwordless/authenticate 先返回、然后 sessions/logout 才落地，
           // 表现就是"刚登进去立刻被踢"（修复 commit 前的同款 race，mount 路径由
           // PrivyAuthSync 覆盖、按钮路径在这里覆盖）。
+          // [AUTH-DEBUG] 临时埋点 — 调试完删
+          try { console.warn('[AUTH-DEBUG] app:openPrivyNative: !reactLogged && authenticated → usePrivy().logout()', '\nstack:', new Error().stack); } catch (_) {}
           try { await logout(); } catch (_) {}
         }
         // fall through —— 让下面的 login() 弹 modal
@@ -183,7 +191,8 @@ function PrivyNativeLauncher() {
         console.warn('[PrivyNativeLauncher] Privy stale-auth, PB logged out — forcing Privy logout');
         // 同上，必须等 sessions/logout 落地再 login()，否则会出现 passwordless/authenticate
         // 之后立刻被 sessions/logout 覆盖的 race。
-        try { await logout(); } catch (_) {}
+        // [AUTH-DEBUG] 临时埋点 — 调试完删
+        try { console.warn('[AUTH-DEBUG] app:openPrivyNative: authenticated && !pbLoggedIn → usePrivy().logout()', '\nstack:', new Error().stack); } catch (_) {}
         // 不 return —— 让下面的 login() 继续跑，弹出 modal 让用户登新号
       }
       try {
@@ -217,9 +226,16 @@ function PrivyNativeLauncher() {
 function PrivyAuthSync() {
   const { authenticated, logout } = usePrivy();
 
+  // [AUTH-DEBUG] 临时埋点 — 监听 Privy SDK 自身的 authenticated 翻转
+  useEffect(() => {
+    try { console.warn('[AUTH-DEBUG] PrivyAuthSync: usePrivy().authenticated =', authenticated, 'PB.isLoggedIn =', PB.isLoggedIn()); } catch (_) {}
+  }, [authenticated]);
+
   // (1) 监听 StoreProvider 的显式 logout
   useEffect(() => {
     const handler = () => {
+      // [AUTH-DEBUG] 临时埋点 — 调试完删
+      try { console.warn('[AUTH-DEBUG] app:auth:logout listener → usePrivy().logout()', '\nstack:', new Error().stack); } catch (_) {}
       try { logout(); } catch (_) {}
     };
     window.addEventListener('app:auth:logout', handler);
@@ -236,6 +252,14 @@ function PrivyAuthSync() {
   // 真要兜底"按钮被点但仍有 desync"走 PrivyNativeLauncher 的 app:openPrivyNative handler，
   // 那里有 reactLogged 权威校验；这里只负责 mount 时的 reload-revival 检测。
   useEffect(() => {
+    // [AUTH-DEBUG] 临时埋点 — 调试完删
+    let _dbgReactLogged = false;
+    try {
+      const _raw = window.localStorage.getItem('tintin:session');
+      const _j = _raw ? JSON.parse(_raw) : null;
+      _dbgReactLogged = !!(_j && _j.value && _j.value.logged);
+    } catch (_) {}
+    try { console.warn('[AUTH-DEBUG] PrivyAuthSync mount effect', { authenticated, pbLoggedIn: PB.isLoggedIn(), reactLoggedFromLS: _dbgReactLogged }); } catch (_) {}
     if (!authenticated || PB.isLoggedIn()) return;
     let reactLogged = false;
     try {
@@ -244,6 +268,8 @@ function PrivyAuthSync() {
       reactLogged = !!(j && j.value && j.value.logged);
     } catch (_) {}
     if (reactLogged) return;        // 用户已登录，这只是 PB bridge 还没追上的瞬态
+    // [AUTH-DEBUG] 临时埋点 — 调试完删
+    try { console.warn('[AUTH-DEBUG] PrivyAuthSync: desync confirmed → usePrivy().logout()', '\nstack:', new Error().stack); } catch (_) {}
     try { logout(); } catch (_) {}  // 真正的 desync：清掉 Privy 残留
   }, [logout]);  // logout 来自 usePrivy 是稳定引用，等价于 mount-only
 

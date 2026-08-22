@@ -82,6 +82,8 @@ export function StoreProvider({ children }) {
   useEffect(() => {
     const restored = PB.loadUserSession();
     if (restored && restored.record) {
+      // [AUTH-DEBUG] 临时埋点 — 调试完删
+      try { console.warn('[AUTH-DEBUG] StoreProvider mount: PB session restored', { email: restored.record.email, id: restored.record.id }); } catch (_) {}
       const r = restored.record;
       setSession((s) => ({
         ...s,
@@ -138,6 +140,8 @@ export function StoreProvider({ children }) {
   // Privy 桥接（spec §6.4 + §14.6）—— 接收后端 /api/auth/privy-bridge 返回值，写入 session
   // payload 形如 { ok, token, record, login_method, subject, strict, role, email, method, ... }
   const loginPrivyBridge = useCallback(async (payload) => {
+    // [AUTH-DEBUG] 临时埋点 — 调试完删
+    try { console.warn('[AUTH-DEBUG] loginPrivyBridge entry', { hasToken: !!(payload && payload.token), hasRecord: !!(payload && payload.record), role: payload && payload.role, method: payload && payload.method }); } catch (_) {}
     if (!payload || !payload.token || !payload.record) {
       throw new Error('Privy 桥接响应缺少 token/record');
     }
@@ -175,6 +179,8 @@ export function StoreProvider({ children }) {
       privy: { subject: payload.subject || '', strict: !!payload.strict, method, role },
     };
     setSession(nextSession);
+    // [AUTH-DEBUG] 临时埋点 — 调试完删
+    try { console.warn('[AUTH-DEBUG] loginPrivyBridge setSession → logged=true', { role: nextSession.role, email: nextSession.email, user_id: nextSession.user_id }); } catch (_) {}
     // 同步把新 session 写到 localStorage。saveState 自带 500ms debounce，
     // 调用方（PrivyNativeLauncher）会再 flushState 一次。这里先 saveState 是
     // 为了兜住"调用方忘了 flush"的场景，以及
@@ -186,6 +192,8 @@ export function StoreProvider({ children }) {
   }, []);
 
   const logout = useCallback(() => {
+    // [AUTH-DEBUG] 临时埋点 — 调试完删
+    try { console.warn('[AUTH-DEBUG] store.logout() called', '\nstack:', new Error().stack); } catch (_) {}
     PB.logout();
     setSession({ logged: false, is_admin: false, role: 'member', method: '', user_id: '', email: '', profile: emptyProfile() });
     setMySignups([]);

@@ -137,7 +137,7 @@ function PrivyNativeLauncher() {
   });
 
   useEffect(() => {
-    const handler = (e) => {
+    const handler = async (e) => {
       pendingAfter = (e && e.detail && typeof e.detail.after === 'function') ? e.detail.after : null;
       if (!ready) {
         console.warn('[PrivyNativeLauncher] Privy not ready yet; ignored');
@@ -153,26 +153,37 @@ function PrivyNativeLauncher() {
         const j = raw ? JSON.parse(raw) : null;
         reactLogged = !!(j && j.value && j.value.logged);
       } catch (_) {}
+      const pbLoggedIn = PB.isLoggedIn();
+      console.warn('[PrivyNativeLauncher] app:openPrivyNative branch check', {
+        ready, authenticated, pbLoggedIn, reactLogged,
+      });
 
       if (!reactLogged) {
-        if (PB.isLoggedIn()) {
+        if (pbLoggedIn) {
           console.warn('[PrivyNativeLauncher] React logged-out but PB token still present — clearing');
           try { PB.logout(); } catch (_) {}
         }
         if (authenticated) {
           console.warn('[PrivyNativeLauncher] React logged-out but Privy still authenticated — clearing');
-          try { logout(); } catch (_) {}
+          // 这里要等 sessions/logout 真的发出去再 login()。否则 logout 的网络请求
+          // 还在飞、login() 已经触发了 passwordless/authenticate；用户快手验证码场景
+          // 下会看到 passwordless/authenticate 先返回、然后 sessions/logout 才落地，
+          // 表现就是"刚登进去立刻被踢"（修复 commit 前的同款 race，mount 路径由
+          // PrivyAuthSync 覆盖、按钮路径在这里覆盖）。
+          try { await logout(); } catch (_) {}
         }
         // fall through —— 让下面的 login() 弹 modal
-      } else if (authenticated && PB.isLoggedIn()) {
+      } else if (authenticated && pbLoggedIn) {
         // 三方一致（React session + Privy + PB 都认为已登录）：真正的"已登录"，跳过 modal。
         // 这里才是不弹 modal 的合法场景；其他 desync 已经在上面兜底过了。
         console.warn('[PrivyNativeLauncher] session/auth/PB all agree: already logged in; skip modal');
         pendingAfter = null;
         return;
-      } else if (authenticated && !PB.isLoggedIn()) {
+      } else if (authenticated && !pbLoggedIn) {
         console.warn('[PrivyNativeLauncher] Privy stale-auth, PB logged out — forcing Privy logout');
-        try { logout(); } catch (_) {}
+        // 同上，必须等 sessions/logout 落地再 login()，否则会出现 passwordless/authenticate
+        // 之后立刻被 sessions/logout 覆盖的 race。
+        try { await logout(); } catch (_) {}
         // 不 return —— 让下面的 login() 继续跑，弹出 modal 让用户登新号
       }
       try {

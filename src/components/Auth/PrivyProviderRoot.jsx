@@ -250,11 +250,12 @@ function PrivyNativeLauncher() {
         return;
       }
       if (authenticated) {
-        console.warn('[PrivyNativeLauncher] already authenticated; ignored');
-        // 已登录也跑一下 after（让调用方跳转/reload）
-        const after = pendingAfter;
+        // 已经登录 —— 不弹 Privy modal，更不盲目跑 after()。
+        // 历史 bug：AdminPage 把 after 当成 location.reload() 来用，已登录时点"用 Privy 登录"
+        // 会让这里执行 reload → 状态不变 → 同帧再点 → 同帧 reload → 体感"页面循环重启"。
+        // 解决：清掉 pendingAfter；不再调 login() / after()。
+        console.warn('[PrivyNativeLauncher] already authenticated; skip');
         pendingAfter = null;
-        if (typeof after === 'function') { try { after(); } catch (_) {} }
         return;
       }
       try {

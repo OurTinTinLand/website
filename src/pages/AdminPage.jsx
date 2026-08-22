@@ -9,6 +9,7 @@
 //   本周目标：模块一（内容管理）+ 模块四（订单核销）必须完整；其余做基础版
 import React, { useState, useMemo, useEffect } from 'react';
 import { useStore, useToast } from '../state/store';
+import { useRoute } from '../utils/router';
 import { money } from '../utils/format';
 import { dogUrl } from '../utils/constants';
 // admin 内容列表从 store.catalog 取（PB 优先 → seed）
@@ -26,7 +27,8 @@ const TABS = [
 ];
 
 export function AdminPage({ openLogin }) {
-  const { session, canAccessAdmin, canSeeAdminTab } = useStore();
+  const { session, canAccessAdmin, canSeeAdminTab, logout } = useStore();
+  const { go } = useRoute();
   const toast = useToast();
   const [tab, setTab] = useState('content');
   const role = session.role || 'member';
@@ -51,12 +53,22 @@ export function AdminPage({ openLogin }) {
           {role === 'super_admin' && ' · PB _superusers 自动识别'}
         </p>
 
-        {!canAccessAdmin(session) && <LoginPrompt onLogin={() => {
-          // 统一入口：openLogin 按 PRIVY_APP_ID 自动分发
-          // SDK 启用 → 直接弹 Privy native modal，登录完成后会调 after → 刷新
-          // SDK 关闭 → 弹 LoginModal → StandaloneLogin fallback
-          openLogin(() => location.reload());
-        }} />}
+        {!session.logged && (
+          <LoginPrompt onLogin={() => {
+            // 统一入口：openLogin 按 PRIVY_APP_ID 自动分发
+            // SDK 启用 → 直接弹 Privy native modal，登录完成后会调 after → 刷新
+            // SDK 关闭 → 弹 LoginModal → StandaloneLogin fallback
+            openLogin(() => location.reload());
+          }} />
+        )}
+
+        {session.logged && !canAccessAdmin(session) && (
+          <NoAccessPanel
+            session={session}
+            onHome={() => go('home')}
+            onLogout={() => { logout(); toast.show('已退出'); go('home'); }}
+          />
+        )}
 
         {canAccessAdmin(session) && tab === 'content'   && <ContentCenter />}
         {canAccessAdmin(session) && tab === 'homeops'   && <HomeOps />}
@@ -83,6 +95,24 @@ function LoginPrompt({ onLogin }) {
       <p className="xs" style={{ color: 'var(--ink-3)' }}>
         角色说明：超级管理员（全部权限） · 内容运营（①+②） · 审核员（③+⑤） · 客服（④+⑤）· 注册用户（个人中心）
       </p>
+    </div>
+  );
+}
+
+// 已登录但角色不在运营白名单 —— 不要把 LoginPrompt 暴露给这种用户，
+// 否则点 "用 Privy 登录" 会让 PrivyNativeLauncher 走 "already authenticated"
+// 分支盲目 reload（at PrivyProviderRoot.jsx），循环往返同一帧（issue：页面循环重启）。
+function NoAccessPanel({ session, onLogout, onHome }) {
+  return (
+    <div className="empty">
+      <img src={dogUrl('dog-sit')} alt="" />
+      你已登录为 <b>{session.email || '（无邮箱）'}</b>，但当前账号 <code>{session.role || 'member'}</code> 没有运营后台权限。
+      <br />
+      如需访问，请联系超管把你的账号在后台 <code>user_profiles.role</code> 字段升级为
+      <code> content_ops</code> / <code>reviewer</code> / <code>customer_support</code> / <code>super_admin</code> 之一。
+      <br /><br />
+      <button className="btn btn-line" onClick={onHome}>返回首页</button>
+      <button className="btn btn-fill" style={{ marginLeft:10 }} onClick={onLogout}>退出当前账号</button>
     </div>
   );
 }

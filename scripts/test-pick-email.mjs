@@ -165,7 +165,7 @@ test('pickMethod: Google OAuth — 归一为 "google"', () => {
     assert.equal(pickMethod(u), 'google');
 });
 
-test('pickMethod: type 直接是 "x" — 走 order 数组里第一个 'x' 槽', () => {
+test("pickMethod: type 直接是 'x' — 走 order 数组里第一个 'x' 槽", () => {
     // 某些旧/自定义 provider 会直接给 type='x'，order 数组同时保留 'x' 和 'twitter'
     // 两条目是为了兼容多种历史格式，期望 'x' 命中
     const u = { linkedAccounts: [{ type: 'x', username: 'me' }] };
@@ -175,7 +175,6 @@ test('pickMethod: type 直接是 "x" — 走 order 数组里第一个 'x' 槽', 
 test('pickMethod: Twitter OAuth — type 是 twitter_oauth', () => {
     const u = { linkedAccounts: [{ type: 'twitter_oauth', username: 'me' }] };
     assert.equal(pickMethod(u), 'twitter');
-  });
 });
 
 test('pickMethod: 无任何 linked account — 回退 "privy"', () => {

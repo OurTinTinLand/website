@@ -274,13 +274,28 @@ function PrivyAuthSync() {
   // (1) 监听 StoreProvider 的显式 logout
   useEffect(() => {
     const handler = () => {
+      // 没在 Privy 登着时跳过 —— 不然 Privy 会去 POST /sessions/logout，服务端
+      // 找不到对应 session 直接 400 + "Error destroying session"，控制台一堆噪音。
+      // 典型触发：bridge-on-auth watcher 把 React session 设上了但 Privy 内部
+      // 没有真实 server-side session（cookie 只剩 rehydrate 状态）。
+      if (!authenticated) {
+        // [AUTH-DEBUG] 临时埋点 — 调试完删
+        try { console.warn('[AUTH-DEBUG] app:auth:logout listener skipped (Privy not authenticated)'); } catch (_) {}
+        return;
+      }
       // [AUTH-DEBUG] 临时埋点 — 调试完删
       try { console.warn('[AUTH-DEBUG] app:auth:logout listener → usePrivy().logout()', '\nstack:', new Error().stack); } catch (_) {}
-      try { logout(); } catch (_) {}
+      // logout() 返回 Promise；用 try/catch 抓不到 rejection，必须 .catch。
+      // 极端情况下 Privy 服务端仍可能 400（比如 cookie 已过期）—— 静默吞掉，
+      // 本地 PB/React session 已经被 store.logout() 清掉了，功能上已经登出。
+      Promise.resolve(logout()).catch((err) => {
+        // [AUTH-DEBUG] 临时埋点 — 调试完删
+        try { console.warn('[AUTH-DEBUG] usePrivy().logout() rejected:', err && err.message); } catch (_) {}
+      });
     };
     window.addEventListener('app:auth:logout', handler);
     return () => window.removeEventListener('app:auth:logout', handler);
-  }, [logout]);
+  }, [authenticated, logout]);
 
   // (2) mount only：处理 reload 后 Privy 从 cookie 复活 + PB 已登出 的 desync。
   //

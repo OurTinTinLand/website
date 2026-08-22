@@ -225,13 +225,17 @@ function PrivyNativeLauncher() {
           } catch (_) {}
           window.dispatchEvent(new CustomEvent('app:auth:login', { detail: data }));
 
-          // 先跑调用方传的 after，再 reload（after 通常自己会 reload）
+          // after 才是"调用方登录后想做的事"（AdminPage 走 location.reload()，
+          // DetailModal 走 openPay(courseId) 等）；它本身就是调用方选的更新策略，
+          // 我们不再叠加 setTimeout(reload, 200) —— 否则两层 reload 互相冲掉
+          // （浏览器正在卸载时 flush 写盘 + 第二次 reload），而且对不带 after 的
+          // 调用方这个 200ms 兜底 reload 会强制硬刷一次，用户体感就是"登录完页面
+          // 不停跳转"。
           const after = pendingAfter;
           pendingAfter = null;
           if (typeof after === 'function') {
             try { await after(); } catch (e) { console.warn('[PrivyNativeLauncher] after() failed:', e); }
           }
-          setTimeout(() => location.reload(), 200);
         }
       } catch (e) {
         console.warn('[PrivyNativeLauncher] bridge failed:', e);

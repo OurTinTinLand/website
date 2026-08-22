@@ -10,13 +10,6 @@
 //     ...
 //   ]
 export function pickEmail(privyUser) {
-  if (typeof window !== 'undefined') console.log('[pickEmail] input shape:', JSON.stringify({
-    hasUser: !!privyUser,
-    emailType: privyUser && typeof privyUser.email,
-    emailKeys: privyUser && privyUser.email && Object.keys(privyUser.email),
-    emailAddress: privyUser && privyUser.email && privyUser.email.address,
-    laTypes: privyUser && privyUser.linkedAccounts && privyUser.linkedAccounts.map(function(a){ return a && a.type; }),
-  }));
   if (!privyUser) return '';
 
   // v3 主流路径：user.email.address

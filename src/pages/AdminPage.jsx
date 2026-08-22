@@ -463,8 +463,8 @@ function ContentEditModal({ def, kind, onClose, onSave }) {
             </>
           )}
 
-          <div className="fr"><label>自定义标签 · 中英文逗号分隔</label>
-            <input value={(draft.tags || []).join('，')} onChange={(e) => set('tags', e.target.value.split(/[,，]/).map((s) => s.trim()).filter(Boolean))} placeholder="Solidity，EVM，审计" />
+          <div className="fr"><label>自定义标签 · 英文逗号分隔</label>
+            <input value={(draft.tags || []).join(',')} onChange={(e) => set('tags', e.target.value.split(',').map((s) => s.trim()).filter(Boolean))} placeholder="Solidity,EVM,审计" />
           </div>
 
           <div className="fr"><label>内容来源</label>

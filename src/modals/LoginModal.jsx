@@ -220,7 +220,11 @@ function PrivyMainButton({ pending, fallbackToStandalone, onLogin }) {
 }
 
 function PrivyDirectLogin({ pending, onLogin }) {
-  const { ready, authenticated, getAccessToken, logout } = usePrivy();
+  const { ready, authenticated, getAccessToken } = usePrivy();
+  // 退出走 store.logout()（PB.logout + setSession + app:auth:logout → PrivyAuthSync → Privy logout）
+  // 而不是 usePrivy().logout()，后者只清 Privy 不动 pb_user_token，造成三向 desync
+  // 让 PrivyNativeLauncher 命中 "already authenticated; skip"。
+  const { logout: storeLogout } = useStore();
   const { login } = useLogin({
     onComplete: async ({ user, loginMethod, loginAccount }) => {
       try {
@@ -253,7 +257,7 @@ function PrivyDirectLogin({ pending, onLogin }) {
       </button>
       {authenticated && (
         <div className="wl" style={{ marginTop: 14 }}>
-          <a onClick={() => { try { logout(); } catch (_) {} }}>退出当前 Privy 账户</a>
+          <a onClick={() => { try { storeLogout(); } catch (_) {} }}>退出当前 Privy 账户</a>
         </div>
       )}
     </>

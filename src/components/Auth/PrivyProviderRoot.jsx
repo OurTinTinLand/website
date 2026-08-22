@@ -255,17 +255,35 @@ function PrivyNativeLauncher() {
         console.warn('[PrivyNativeLauncher] Privy not ready yet; ignored');
         return;
       }
-      if (authenticated) {
-        // 防 desync：PB 才是真正权威。Privy SDK 自己有 cookie/localStorage 续命，
-        // 哪怕 PB.logout() 把 token 清掉，Privy 那边的 authenticated 还是会 true，
-        // reload 之后还会从 cookie 复活 —— 这时点登录按钮就会被这一行无声 skip 掉。
-        // PB 没登录就走不到"已经登录"路径；强制 Privy logout 后继续往下，让用户
-        // 能正常登另一个号。
+
+      // 权威源：tintin:session.logged。store.logout() 已经把三向源都清掉了，
+      // 任何 "React 已登出 但 PB/Privy 还在线" 的路径都视为 desync，强制清掉再 login。
+      // 这条路径只补漏（比如 LoginModal 曾经直接调 usePrivy().logout() 不走 store）；
+      // 正常 store.logout() 之后这里 reactLogged 已经是 false，PB 和 Privy 也都空了。
+      let reactLogged = false;
+      try {
+        const raw = window.localStorage.getItem('tintin:session');
+        const j = raw ? JSON.parse(raw) : null;
+        reactLogged = !!(j && j.value && j.value.logged);
+      } catch (_) {}
+
+      if (!reactLogged) {
         if (PB.isLoggedIn()) {
-          console.warn('[PrivyNativeLauncher] already authenticated; skip');
-          pendingAfter = null;
-          return;
+          console.warn('[PrivyNativeLauncher] React logged-out but PB token still present — clearing');
+          try { PB.logout(); } catch (_) {}
         }
+        if (authenticated) {
+          console.warn('[PrivyNativeLauncher] React logged-out but Privy still authenticated — clearing');
+          try { logout(); } catch (_) {}
+        }
+        // fall through —— 让下面的 login() 弹 modal
+      } else if (authenticated && PB.isLoggedIn()) {
+        // 三方一致（React session + Privy + PB 都认为已登录）：真正的"已登录"，跳过 modal。
+        // 这里才是不弹 modal 的合法场景；其他 desync 已经在上面兜底过了。
+        console.warn('[PrivyNativeLauncher] session/auth/PB all agree: already logged in; skip modal');
+        pendingAfter = null;
+        return;
+      } else if (authenticated && !PB.isLoggedIn()) {
         console.warn('[PrivyNativeLauncher] Privy stale-auth, PB logged out — forcing Privy logout');
         try { logout(); } catch (_) {}
         // 不 return —— 让下面的 login() 继续跑，弹出 modal 让用户登新号

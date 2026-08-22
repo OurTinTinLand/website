@@ -1,5 +1,5 @@
 // 顶层装配
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { StoreProvider, ToastProvider, useStore, useToast } from './state/store';
 import { Router, useRoute } from './utils/router';
@@ -28,7 +28,6 @@ import { AuthLoginPage, AuthCallbackPage } from './pages/AuthPages';
 import { courses as seedCourses, events as seedEvents, hackathons as seedHackathons, jobs as seedJobs } from './data/index.js';
 
 import { DetailModal } from './modals/DetailModal';
-import { LoginModal } from './modals/LoginModal';
 import { FormModal } from './modals/FormModal';
 import { PayModal } from './modals/PayModal';
 
@@ -37,8 +36,6 @@ function Shell() {
   const { session, canAccessAdmin, catalog } = useStore();
   const toast = useToast();
 
-  const [loginOpen,  setLoginOpen]  = useState(false);
-  const [loginAfter, setLoginAfter] = useState(null);
   const [formDef,    setFormDef]    = useState(null);
   const [payCourseId, setPayCourseId] = useState(null);
 
@@ -48,27 +45,11 @@ function Shell() {
   const hackathons = catalog?.hackathons ?? seedHackathons;
   const jobs       = catalog?.jobs       ?? seedJobs;
 
-  // 统一登录入口：SDK enabled → 直接 dispatch app:openPrivyNative，PrivyNativeLauncher 监听后会直接弹 Privy native modal
-  //                SDK disabled → fallback 到 LoginModal（含 PrivyStandaloneLogin 离线 OAuth 兜底）
+  // 统一登录入口：dispatch app:openPrivyNative → PrivyNativeLauncher 直接弹 Privy 原生 modal
   const openLogin  = (after) => {
-    const appId = window.PRIVY_APP_ID && String(window.PRIVY_APP_ID).trim();
-    if (appId) {
-      // 把 after 回调带在事件 detail 里，PrivyNativeLauncher 的 onComplete 会调它
-      window.dispatchEvent(new CustomEvent('app:openPrivyNative', { detail: { after } }));
-      return;
-    }
-    setLoginAfter(() => after || null);
-    setLoginOpen(true);
+    window.dispatchEvent(new CustomEvent('app:openPrivyNative', { detail: { after } }));
   };
-  const closeLogin = () => setLoginOpen(false);
 
-  // 监听全局 'app:openLogin' 事件 —— AdminPage 那边没用 prop 链，只能靠 CustomEvent
-  // （commit 5252634 的 commit message 里说要注册，但实际代码里漏了，运营后台的"用 Privy 登录"点了没反应）
-  useEffect(() => {
-    const handler = (e) => openLogin(e.detail && e.detail.after);
-    window.addEventListener('app:openLogin', handler);
-    return () => window.removeEventListener('app:openLogin', handler);
-  }, []);
   const openForm   = (kind, id, itemTitle) => setFormDef({ kind, id, itemTitle });
   const closeForm  = () => setFormDef(null);
   const openPay    = (courseId) => setPayCourseId(courseId);
@@ -135,7 +116,6 @@ function Shell() {
         />
       )}
 
-      <LoginModal open={loginOpen} afterLogin={loginAfter} onClose={closeLogin} />
       <FormModal def={formDef} onClose={closeForm} />
       <PayModal
         course={payCourseId ? courses.find((c) => c.id === payCourseId) : null}
@@ -151,8 +131,7 @@ function Shell() {
 
 function App() {
   return (
-    // PrivyProviderRoot 必须放在最外层（因为 LoginModal 内部会用到 PrivyProvider 的子树）。
-    // 它自己有 SDK / fallback 自动适配逻辑：没装 @privy-io/react-auth 包时不报错。
+    // PrivyProviderRoot 必须放在最外层（内部会用到 PrivyProvider 的子树）。
     <PrivyProviderRoot>
       <StoreProvider>
         <ToastProvider>

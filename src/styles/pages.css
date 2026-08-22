@@ -94,6 +94,3 @@
 .recoWrap{display:flex;flex-direction:column;gap:clamp(40px,5vw,66px);}
 
 /* ============ table.t 注入（在 layout.css 中已声明；这里延伸为基本数据态） ============ */
-
-/* LoginModal 内 OTP 等输入元素颜色 */
-.otp input{caret-color:var(--ink);}

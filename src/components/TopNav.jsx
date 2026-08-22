@@ -30,7 +30,7 @@ export function TopNav({ openLogin }) {
   useEffect(() => { setMenuOpen(false); }, [page]);
 
   const onAuthClick = () => {
-    // 统一入口：openLogin 在 Shell 里按 PRIVY_APP_ID 自动分发（SDK → native modal / fallback → LoginModal）
+    // 统一入口：openLogin dispatch 'app:openPrivyNative'，PrivyNativeLauncher 直接弹 Privy 原生 modal
     if (session.logged) { go('member'); return; }
     openLogin(null);
   };

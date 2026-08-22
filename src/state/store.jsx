@@ -177,7 +177,7 @@ export function StoreProvider({ children }) {
     setSession(nextSession);
     // 同步把新 session 写到 localStorage。saveState 自带 500ms debounce，
     // 调用方（PrivyNativeLauncher）会再 flushState 一次。这里先 saveState 是
-    // 为了兜住"调用方忘了 flush"的场景（LoginModal 的几条老路径），以及
+    // 为了兜住"调用方忘了 flush"的场景，以及
     // 让"组件卸载前 + reload"之间多一次保险。
     try {
       saveState('session', nextSession);

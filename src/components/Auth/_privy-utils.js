@@ -1,4 +1,4 @@
-// Privy user → 平铺字段工具（与 PrivyBridge/PrivyProviderRoot 共享）
+// Privy user → 平铺字段工具（与 PrivyProviderRoot 共享）
 //
 // Privy v3 (>=3.x) 的 user 对象结构：
 //   user.email:  { address: string }                       ← 单字段对象（不是 addresses[]）

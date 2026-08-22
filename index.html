@@ -36,7 +36,7 @@
 
   <!--
     占位 2：start.sh 注入 → window.PRIVY_APP_ID / window.PRIVY_CLIENT_ID / window.PRIVY_LOGIN_METHODS
-    没设 PRIVY_APP_ID 时占位保留为注释 → PrivyProviderRoot 走 fallback（无 SDK OAuth 直连）
+    没设 PRIVY_APP_ID 时占位保留为注释 → PrivyProviderRoot 不挂载 PrivyProvider，登录按钮静默无响应
   -->
   <!--INJECT:PRIVY_CONFIG-->
 

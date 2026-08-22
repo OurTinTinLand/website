@@ -81,7 +81,7 @@ content = idx.read_text(encoding="utf-8")
 placeholder = "<!--INJECT:PRIVY_CONFIG-->"
 
 if not app_id:
-    print("[backend/start.sh] PRIVY_APP_ID not set; Privy login will use offline-OAuth fallback", flush=True)
+    print("[backend/start.sh] PRIVY_APP_ID not set; frontend login will be SILENT (no Privy provider)", flush=True)
 else:
     parts = [
         '<script>window.PRIVY_APP_ID="' + html.escape(app_id, quote=True) + '";</script>'

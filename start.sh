@@ -57,12 +57,11 @@ PB_ADMIN_PASSWORD="${PB_ADMIN_PASSWORD:-tintinland2026}"
 # - 仅用于"运营后台 demo 模式" —— 真实生产请关闭 demo admin。
 PB_ADMIN_DEMO_SECRET="${PB_ADMIN_DEMO_SECRET:-}"
 
-# Privy 配置（可选；不设 → 前端走 OAuth 直连兜底）：
-#   - PRIVY_APP_ID：必填（Privy Dashboard → App settings → App ID）
+# Privy 配置（必填；Privy Dashboard → App settings）：
+#   - PRIVY_APP_ID：必填 —— 没设的话前端登录按钮点不动（PrivyProvider 不挂载）
 #   - PRIVY_CLIENT_ID：Public client ID，OAuth 客户端配置用（同页面）
 #   - PRIVY_LOGIN_METHODS：逗号分隔，常见值 email,google,x,github,discord,wallet,apple,sms
 #   - PRIVY_APP_SECRET：只用于后端验签（backend/pb_hooks/auth.pb.js），不在前端暴露
-#   - 没设 PRIVY_APP_ID 时占位保留为注释，LoginModal 仅展示"无 SDK 兜底登录面板"。
 PRIVY_APP_ID="${PRIVY_APP_ID:-}"
 PRIVY_CLIENT_ID="${PRIVY_CLIENT_ID:-}"
 PRIVY_LOGIN_METHODS="${PRIVY_LOGIN_METHODS:-email,google,x,github,discord,wallet}"
@@ -147,8 +146,10 @@ content = idx.read_text(encoding="utf-8")
 placeholder = "<!--INJECT:PRIVY_CONFIG-->"
 
 if not app_id:
-    # 没配置 PRIVY_APP_ID → 占位保持注释，frontend 自动 fallback 到无 SDK 模式
-    print("[start.sh] PRIVY_APP_ID not set; Privy login will use offline-OAuth fallback", flush=True)
+    # 没配置 PRIVY_APP_ID → 占位保持注释；PrivyProviderRoot 不挂载 PrivyProvider，
+    # 登录按钮 dispatch 的 'app:openPrivyNative' 事件没人监听 —— 这是环境配置错误，
+    # 操作员必须设置 PRIVY_APP_ID 才能让前端登录生效。
+    print("[start.sh] PRIVY_APP_ID not set; frontend login will be SILENT (no Privy provider)", flush=True)
 else:
     # 多行 <script> 注入（公开值，且需要让 frontend 一次拿到 methods 列表）
     parts = []

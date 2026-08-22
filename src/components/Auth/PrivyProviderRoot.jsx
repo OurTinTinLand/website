@@ -328,12 +328,26 @@ function PrivyAuthSync() {
     return () => window.removeEventListener('app:auth:logout', handler);
   }, [logout]);
 
-  // (2) mount + 每次 Privy authenticated 变化：检查 desync
+  // (2) mount only：处理 reload 后 Privy 从 cookie 复活 + PB 已登出 的 desync。
+  //
+  // 不能订阅 authenticated 变化！那样会在 login 流程中间（Privy 刚返回 authenticated=true
+  // 但 PB bridge 还没跑完，PB.isLoggedIn() 还是 false）命中条件，调 logout() 把刚成功的
+  // 登录干掉，向 Privy 重复发 sessions/logout —— 用户表现就是 passwordless/authenticate
+  // 之后立刻被踢。
+  //
+  // 真要兜底"按钮被点但仍有 desync"走 PrivyNativeLauncher 的 app:openPrivyNative handler，
+  // 那里有 reactLogged 权威校验；这里只负责 mount 时的 reload-revival 检测。
   useEffect(() => {
-    if (authenticated && !PB.isLoggedIn()) {
-      try { logout(); } catch (_) {}
-    }
-  }, [authenticated, logout]);
+    if (!authenticated || PB.isLoggedIn()) return;
+    let reactLogged = false;
+    try {
+      const raw = window.localStorage.getItem('tintin:session');
+      const j = raw ? JSON.parse(raw) : null;
+      reactLogged = !!(j && j.value && j.value.logged);
+    } catch (_) {}
+    if (reactLogged) return;        // 用户已登录，这只是 PB bridge 还没追上的瞬态
+    try { logout(); } catch (_) {}  // 真正的 desync：清掉 Privy 残留
+  }, [logout]);  // logout 来自 usePrivy 是稳定引用，等价于 mount-only
 
   return null;
 }

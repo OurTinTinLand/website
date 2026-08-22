@@ -20,7 +20,7 @@
 // 运行入口：<PrivyProviderRoot><App/></PrivyProviderRoot>（App.jsx）。
 // 唯一区分点：loginMethods 白名单 + 是否包 <PrivyProvider>。
 // =============================================================================
-import React, { useEffect, useRef, useCallback } from 'react';
+import React, { useEffect, useCallback } from 'react';
 import { PrivyProvider, useLogin, usePrivy } from '@privy-io/react-auth';
 import { pickEmail, pickSubject, pickMethod } from './_privy-utils.js';
 import * as PB from '../../utils/pb-client.js';
@@ -79,6 +79,13 @@ export function PrivyProviderRoot({ children }) {
 //      PRIVY_APP_ID 未配置时这个组件不挂载，事件无人监听（环境配置错误，按钮静默无响应）。
 //
 // 注意：必须挂在 PrivyProvider 内才能调 useLogin；所以放在 return <PrivyProvider>...</PrivyProvider> 里。
+// Module-level flag：让 PrivyNativeLauncher（runPrivyBridge）和 PrivyAuthSync
+// （mount effect desync 检查）这两个兄弟组件协调 bridge in-progress 状态。
+// 不能放 React state —— 跨组件要立即可见，且 effect 调用栈里读到的是最新值。
+// 必须在 PrivyNativeLauncher / PrivyAuthSync 之前定义（函数提升 + 模块顶层 eval）。
+let _bridgeInProgress = false;
+export function getBridgeInProgress() { return _bridgeInProgress; }
+
 function PrivyNativeLauncher() {
   const { ready, authenticated, user, getAccessToken, logout } = usePrivy();
   // pendingAfter：调用方传入的 after 回调（如 () => openPay(courseId)）。
@@ -86,17 +93,17 @@ function PrivyNativeLauncher() {
   // 进了 React state，AdminPage 等会自然 re-render；硬刷会和 saveState debounce /
   // Privy rehydration 互相冲掉，导致登录后页面回到旧 role / 反复弹 LoginPrompt。
   let pendingAfter = null;
-  // 防止同一登录态被桥接两次：onComplete（fresh login）和下面的 authenticated
-  // watcher（cookie rehydration）都可能触发；bridgingRef 串行化保证只跑一次。
-  const bridgingRef = useRef(false);
 
   // Bridge helper：从 Privy user 拉 PB token，写进 store + localStorage + 派 app:auth:login。
   // 同时被 onComplete（fresh login 路径）和下面 bridge-on-auth watcher（cookie rehydrate /
-  // onComplete 未派发的兜底路径）调用；bridgingRef 串行化保证只跑一次。
+  // onComplete 未派发的兜底路径）调用；_bridgeInProgress 串行化保证只跑一次，且让
+  // PrivyAuthSync 在 bridge 进行中跳过 desync 强 logout。
   const runPrivyBridge = useCallback(async () => {
-    if (bridgingRef.current) return false;
+    // 用 module-level flag 防止双重调用 + 让 PrivyAuthSync 的 mount effect
+    // 看到"bridge 在跑"跳过 desync 强 logout（避免把刚登入的 Privy 踢掉）。
+    if (_bridgeInProgress) return false;
     if (!user) return false;
-    bridgingRef.current = true;
+    _bridgeInProgress = true;
     try {
       const email   = pickEmail(user);
       const subject = pickSubject(user);
@@ -141,7 +148,7 @@ function PrivyNativeLauncher() {
       console.warn('[PrivyNativeLauncher] bridge failed:', e);
       return false;
     } finally {
-      bridgingRef.current = false;
+      _bridgeInProgress = false;
     }
   }, [user, getAccessToken]);
 
@@ -150,7 +157,7 @@ function PrivyNativeLauncher() {
       // fresh login 路径。bridge 实际上由 bridge-on-auth watcher 兜底（它覆盖
       // fresh login / cookie rehydrate / onComplete 未派发 三种情况）。
       // 这里只 await 一下，确保 pendingAfter 在 session 落地之后再触发；
-      // bridgingRef 防止双重调用。
+      // _bridgeInProgress 防止双重调用。
       try { await runPrivyBridge(); } catch (_) {}
       // after 是"调用方登录后想做的事"（DetailModal 走 openPay(courseId) 等）；
       // 它本身就是调用方选的更新策略，我们不再叠加任何自动 reload。
@@ -173,7 +180,7 @@ function PrivyNativeLauncher() {
   //   1) Privy cookie rehydrate（onComplete 不会派）
   //   2) onComplete 因为其他原因未派发
   // 不 watch user 单独变化 —— user 是 authenticated 的派生量；deps 含 authenticated 就够。
-  // bridgingRef 防止 onComplete 路径同时触发时双跑。
+  // _bridgeInProgress 防止 onComplete 路径同时触发时双跑。
   useEffect(() => {
     if (!ready || !authenticated || !user) return;
     if (PB.isLoggedIn()) return;
@@ -314,7 +321,14 @@ function PrivyAuthSync() {
       const _j = _raw ? JSON.parse(_raw) : null;
       _dbgReactLogged = !!(_j && _j.value && _j.value.logged);
     } catch (_) {}
-    try { console.warn('[AUTH-DEBUG] PrivyAuthSync mount effect', { authenticated, pbLoggedIn: PB.isLoggedIn(), reactLoggedFromLS: _dbgReactLogged }); } catch (_) {}
+    try { console.warn('[AUTH-DEBUG] PrivyAuthSync mount effect', { authenticated, pbLoggedIn: PB.isLoggedIn(), reactLoggedFromLS: _dbgReactLogged, bridgeInProgress: getBridgeInProgress() }); } catch (_) {}
+    // bridge 在跑就跳过 —— 这是 desync 的"伪相"，bridge 完成后会自然解决。
+    // 不跳过的话：bridge-on-auth watcher 启动 bridge（PB 还是 false）→ mount effect
+    // 同时看到 desync → 强制 logout → 把刚登入的 Privy 踢掉，bridge 完成后 Privy 已死。
+    if (getBridgeInProgress()) {
+      try { console.warn('[AUTH-DEBUG] PrivyAuthSync mount effect skipped (bridge in progress)'); } catch (_) {}
+      return;
+    }
     if (!authenticated || PB.isLoggedIn()) return;
     let reactLogged = false;
     try {
@@ -326,7 +340,16 @@ function PrivyAuthSync() {
     // [AUTH-DEBUG] 临时埋点 — 调试完删
     try { console.warn('[AUTH-DEBUG] PrivyAuthSync: desync confirmed → usePrivy().logout()', '\nstack:', new Error().stack); } catch (_) {}
     try { logout(); } catch (_) {}  // 真正的 desync：清掉 Privy 残留
-  }, [logout]);  // logout 来自 usePrivy 是稳定引用，等价于 mount-only
+  }, [logout]);
+  // deps 故意保持 [logout]：usePrivy() 在 authenticated 翻转时返回的 logout 是新引用，
+  // effect 会跟着重跑。**重跑安全靠的是上面的 getBridgeInProgress() 早返回**——
+  // PrivyNativeLauncher 在自己 effect 里先一步启动 runPrivyBridge（同步设
+  // _bridgeInProgress=true），等到本组件的 mount effect 重跑到这里时一定能看到
+  // bridge 在跑而跳过；bridge 结束（finally 置 false）后如果还在 desync 状态
+  // 下一次 effect 重跑会兜住。这避免了"deps=[] → mount-only → bridge 来不及跑就被
+  // desync 杀死"和"deps=[authenticated] → 误杀"两个极端。
+  // 注释里旧的"logout 是稳定引用，等价于 mount-only"是错的（正是这个误判导致
+  // 上一个 bug：effect 把 login 流程的瞬态当成 desync 强 logout）。
 
   return null;
 }

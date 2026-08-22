@@ -216,6 +216,13 @@ function PrivyNativeLauncher() {
         if (data && data.token && data.record) {
           const { loginPrivyBridge } = await import('../../state/store.jsx');
           try { await loginPrivyBridge(data); } catch (_) {}
+          // 同步 flush session 到 localStorage（saveState 有 500ms debounce，
+          // 如果不等 flush 就 reload，新 session 没写出去 → reload 后看起来未登录
+          // → 触发再登录 → 死循环）
+          try {
+            const persist = await import('../../state/persist.js');
+            persist.flushState('session');
+          } catch (_) {}
           window.dispatchEvent(new CustomEvent('app:auth:login', { detail: data }));
 
           // 先跑调用方传的 after，再 reload（after 通常自己会 reload）

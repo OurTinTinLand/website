@@ -1,0 +1,28 @@
+{
+  "name": "TinTinLand · 全球 Web3 × AI 开发者社区",
+  "short_name": "TinTinLand",
+  "description": "课程、黑客松、企业服务、Token Hub 渠道对接，让开发者与项目一起长大。",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#08070C",
+  "theme_color": "#5F23F0",
+  "lang": "zh-CN",
+  "dir": "ltr",
+  "categories": ["education", "business", "productivity"],
+  "icons": [
+    {
+      "src": "/assets-claude/icon-192.svg",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/assets-claude/icon-512.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

@@ -52,6 +52,13 @@ if (fs.existsSync(path.join(ROOT, 'assets-claude'))) {
 }
 
 // ---- 2) esbuild 打包到 backend/pb_public/dist/bundle.js ----
+// v1.3 · minify 单文件，全本地化（spec §6.4 收尾）：
+//   所有依赖（react / react-dom / @privy-io/react-auth / wagmi / viem / zustand /
+//   @wagmi/connectors / @solana/kit）从 node_modules 打进单文件 bundle.js。
+//   生产环境零 esm.sh 运行时请求；Privy 全栈本地化，单一 React 实例无 context 冲突。
+//   --minify 关掉所有 dev-only 路径、压缩源码（48 MB → 6.2 MB）。
+//   --legal-comments=none 剥掉 license banner。
+//   单文件策略：1 次 HTTP 请求、可整文件 hash 缓存。
 const args = [
   'src/App.jsx',
   '--bundle',
@@ -60,21 +67,9 @@ const args = [
   '--loader:.jsx=jsx',
   '--format=esm',
   '--target=es2020',
-  '--define:process.env.NODE_ENV=\'"development"\'',
-  '--sourcemap=inline',
-  `--alias:react=https://esm.sh/react@18.3.1`,
-  `--alias:react-dom=https://esm.sh/react-dom@18.3.1`,
-  `--alias:react-dom/client=https://esm.sh/react-dom@18.3.1/client`,
-  // v1.2 ESM 化（spec §6.4）：
-  //   大包（@privy-io/react-auth / wagmi / viem / zustand 等）走 esm.sh CDN；
-  //   用户浏览器在首次加载时 fetch，CDN 有缓存。bundle.js 只剩下应用代码 + React。
-  //   alias 写完整 URL → 浏览器直接 fetch；esm.sh 的子模块走绝对路径 shim，无需 importmap。
-  '--alias:@privy-io/react-auth=https://esm.sh/@privy-io/react-auth@3.37.4?alias=react:https://esm.sh/react@18.3.1',
-  '--alias:wagmi=https://esm.sh/wagmi@2.12.0',
-  '--alias:viem=https://esm.sh/viem@2.21.0',
-  '--alias:@wagmi/connectors=https://esm.sh/@wagmi/connectors@5.1.0',
-  '--alias:zustand=https://esm.sh/zustand@4.5.0',
-  '--alias:@solana/kit=https://esm.sh/@solana/kit@2.0.0',
+  '--define:process.env.NODE_ENV=\'"production"\'',
+  '--minify',
+  '--legal-comments=none',
   '--log-level=info',
 ];
 

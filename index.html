@@ -41,12 +41,11 @@
   <link rel="stylesheet" href="src/styles/pages.css">
 
   <!--
-    v1.2 全 ESM 化（spec §6.4 / §14.6）
+    v1.3 全本地化（spec §6.4 / §14.6）
     bundle.js 是 ES Module（type="module"），浏览器以 module 加载。
-    esbuild --alias 把 'react' / '@privy-io/react-auth' / 'wagmi' / 'viem' 等
-    替换为完整 esm.sh URL，浏览器直接 fetch；esm.sh 反吐的子模块也走
-    路径绝对（/pkg@ver/...）的 shim，无需 importmap。
-    单一 React 实例（来自 esm.sh/react@18）：bundled React 与 Privy 内部模块共享。
+    所有依赖（react / react-dom / @privy-io/react-auth / wagmi / viem / zustand /
+    @wagmi/connectors / @solana/kit）由 esbuild 在 build 时从 node_modules 打进 bundle.js。
+    生产环境零 esm.sh 运行时请求；Privy 全栈本地化，单一 React 实例无 context 冲突。
   -->
 </head>
 <body>
@@ -64,10 +63,8 @@
   <!--INJECT:PRIVY_CONFIG-->
 
   <!--
-    v1.2：bundle.js 是 ES Module（--format=esm）。所有依赖（react / @privy-io/react-auth / viem / wagmi 等）
-          已经由 esbuild 在 build 时通过 --alias:react=https://esm.sh/react@18
-          把 'react' import 重写到 esm.sh URL，浏览器会直接 fetch。
-          单一 React 实例；无 context 冲突（修 v1.2 上线后报的 "useContext null" 报错）。
+    v1.3：bundle.js 是 ES Module（--format=esm）。所有依赖已经从 node_modules 打进 bundle.js。
+          单一 React 实例；无 context 冲突。
   -->
   <script type="module" src="dist/bundle.js"></script>
 </body>

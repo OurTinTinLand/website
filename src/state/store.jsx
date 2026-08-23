@@ -389,7 +389,7 @@ export function ToastProvider({ children }) {
   return (
     <ToastCtx.Provider value={value}>
       {children}
-      <div style={{ position: 'fixed', left: 0, right: 0, bottom: 34, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, zIndex: 120, pointerEvents: 'none' }}>
+      <div style={{ position: 'fixed', left: 0, right: 0, bottom: 34, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, zIndex: 999, pointerEvents: 'none' }}>
         {toasts.map((t) => <div key={t.id} className="toast on">{t.msg}</div>)}
       </div>
     </ToastCtx.Provider>

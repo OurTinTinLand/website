@@ -83,7 +83,6 @@ export function FormModal({ def, onClose, onSubmitted }) {
           <button className="btn btn-fill btn-lg" style={{ width:'100%', marginTop:10 }} disabled={pending} onClick={submit}>
             {pending ? '提交中…' : '提交'}
           </button>
-          <div className="spec">表单数据写入 PB signups 集合（spec §14.4 审核中心统一处理）。</div>
         </div>
       </div>
     </div>

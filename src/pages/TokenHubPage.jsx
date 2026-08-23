@@ -102,16 +102,13 @@ export function TokenHubPage() {
               <p>运营一个工作日内联系，确认用量后线下结算并开通账号，把 key 和用量看板一起交付。</p>
             </div>
           </div>
-          <div className="spec">当前为「意向单 → 人工对接」模式，自助下单与实时用量看板后续上线。</div>
         </div>
 
         {/* 3 · 提交意向 */}
         <div className={'thv' + (tab === 3 ? ' on' : '')}>
-          <div className="two">
-            <div>
-              <h3 className="t3" style={{ marginBottom:8 }}>提交对接意向</h3>
-              <p className="xs" style={{ margin:'0 0 26px' }}>提交后进入运营后台，状态流转 pending → contacted → closed。</p>
-              <div className="fr"><label>想对接的渠道</label>
+          <div>
+            <h3 className="t3" style={{ marginBottom:26 }}>提交对接意向</h3>
+            <div className="fr"><label>想对接的渠道</label>
                 <select id="ti-provider">
                   {[...providers.map((p) => <option key={p.id}>{p.name}</option>), <option key="__rec">还没确定，帮我推荐</option>]}
                 </select>
@@ -133,17 +130,6 @@ export function TokenHubPage() {
                 <div className="hint">登录后自动带出账号邮箱，不用重复填。</div>
               </div>
               <button className="btn btn-fill btn-lg" style={{ width:'100%', marginTop:10 }} onClick={submitIntent}>提交意向单</button>
-            </div>
-            <div>
-              <div className="fcard" style={{ background:'var(--paper-2)' }}>
-                <h4 className="t4" style={{ marginBottom:14 }}>为什么本周不做自动扣费</h4>
-                <p className="sm" style={{ margin:0 }}>
-                  自动扣费要处理预充值余额、并发额度控制、渠道商回调对账、退款与超卖兜底四类风控，
-                  任何一处不扎实都直接产生资金损失。一周做不完，所以先用人工对接跑通闭环、验证真实需求量，再决定值不值得投入自动化。
-                </p>
-                <div className="spec">TokenHubIntent：{`{ id, user_id, provider, expected_volume, contact, status }`}</div>
-              </div>
-            </div>
           </div>
         </div>
       </div>

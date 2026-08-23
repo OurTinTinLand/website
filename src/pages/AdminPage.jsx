@@ -212,7 +212,7 @@ function ContentCenter() {
         课程 / 活动 / 黑客松 / 招聘 / 应用工具 / Token Hub 渠道 · 统一「列表 → 新建 → 编辑 → 上下架 → 删除」标准链路。
         {catalog?._source === 'fallback' && (
           <span style={{ marginLeft:10, color:'var(--danger, #c33)' }}>
-            ⚠ PB 未连接 · 当前为种子数据，操作仅本地生效
+            ⚠ 后端未连接 · 当前为本地缓存，编辑操作不会保存
           </span>
         )}
       </div>

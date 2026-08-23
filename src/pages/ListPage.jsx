@@ -100,7 +100,7 @@ export function ListPage({ kind, onOpen, onApply, onConsult }) {
         )}
 
         {catalog?._source === 'fallback' && (
-          <div className="banner"><span>ℹ</span><div>当前为种子数据 · 后端 PB 未连接</div></div>
+          <div className="banner"><span>ℹ</span><div>内容可能不是最新版本，请刷新页面重试</div></div>
         )}
 
         <ListFilters kind={kind} filter={filter} setFilter={setFilter} categories={cats} />

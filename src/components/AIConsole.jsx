@@ -6,12 +6,13 @@ import { BotBubble, UserBubble } from '../ai/ChatBubble';
 import { dogUrl } from '../utils/constants';
 
 // spec §5：快捷 chip
+// label: chip 上展示的短文案；query: 点击后传给 ask() 的完整查询（决定 user 气泡与规则匹配）
 const CHIPS = [
-  '推荐一门课',
-  '最近的黑客松',
-  '生态里的工作',
-  '买大模型 token',
-  '先随便看看',
+  { label:'推荐一门课',     query:'推荐一门课' },
+  { label:'最近的黑客松',   query:'最近有什么黑客松' },
+  { label:'生态里的工作',   query:'找生态工作' },
+  { label:'买大模型 token', query:'了解 token hub 怎么充值' },
+  { label:'先随便看看',     query:'随便看看' },
 ];
 
 // spec §5：初始气泡
@@ -82,8 +83,8 @@ export function AIConsole({ onAskReady }) {
           <button type="submit" className="send" aria-label="发送">→</button>
         </form>
         <div className="qs">
-          {CHIPS.map((q) => (
-            <button key={q} onClick={() => ask(q)}>{q}</button>
+          {CHIPS.map((c) => (
+            <button key={c.label} onClick={() => ask(c.query)}>{c.label}</button>
           ))}
         </div>
       </div>

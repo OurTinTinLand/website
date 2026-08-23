@@ -356,7 +356,7 @@ function initialList(kind, cat) {
     : [];
   if (Array.isArray(arr) && arr.length) return arr.map(slim);
   // 降级占位（仅在 PB 完全无数据时展示，让运营至少能看到空白页结构）
-  if (kind === 'apps')       return [{ id:'ap-1', title:'占位应用', state:'upcoming', review_required:false, content_source:'native', fields_config:{}, tags:[] }];
+  if (kind === 'apps')       return [{ id:'ap-1', title:'应用待上架', state:'upcoming', review_required:false, content_source:'native', fields_config:{}, tags:[] }];
   if (kind === 'providers')  return [{ id:'pv-1', title:'合作渠道 A', state:'upcoming', review_required:false, content_source:'native', fields_config:{}, tags:[] }];
   return [];
 }
@@ -708,8 +708,8 @@ function NotifyConfig() {
         <div className="fr"><label>活动提醒</label>
           <textarea rows="2" defaultValue="{item_title} 将在 {start_at} 开始，记得按时参加。" />
         </div>
-        <button className="btn btn-fill" style={{ marginTop:10 }}>保存模板（V1.1）</button>
-        <div className="spec">V1.1 接入 PocketBase hooks 后，运营改文案无需发布。</div>
+        <button className="btn btn-fill" style={{ marginTop:10 }}>保存模板</button>
+        <div className="spec">运营可直接修改文案，无需重新发布。</div>
       </div>
     </>
   );

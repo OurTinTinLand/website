@@ -52,7 +52,7 @@ export function TopNav({ openLogin }) {
           ))}
         </div>
         <div className="nav-r">
-          <button className="btn btn-line btn-sm lang" onClick={() => toast.show('i18n 留到 V1.1')}>EN</button>
+          <button className="btn btn-line btn-sm lang" onClick={() => toast.show('EN 即将上线')}>EN</button>
           {canAccessAdmin(session) && (
             <button className="btn btn-line btn-sm" id="navAdmin" onClick={() => go('admin')}>运营后台</button>
           )}

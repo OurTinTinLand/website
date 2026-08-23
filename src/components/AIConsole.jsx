@@ -55,7 +55,7 @@ export function AIConsole({ onAskReady }) {
           <div className="face"><img src={dogUrl('dog-head')} alt="TinTin" /></div>
           <div>
             <div className="tt">TinTin</div>
-            <div className="ss">规则引擎 v1 · 真模型排在 V1.1，接口先留好</div>
+            <div className="ss">TinTin 助手 · 持续优化中</div>
           </div>
         </div>
         <div className="log" id="chatlog" ref={logRef}>

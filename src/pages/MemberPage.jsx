@@ -163,7 +163,7 @@ function OrdersTab({ mine }) {
                 </td>
                 <td>
                   {o.advisor_code_sent
-                    ? <button className="lnk" onClick={() => alert('（演示）顾问微信二维码占位')}>查看 →</button>
+                    ? <button className="lnk" onClick={() => alert('顾问微信二维码将在发放后展示')}>查看 →</button>
                     : <span className="xs">未发放</span>}
                 </td>
               </tr>

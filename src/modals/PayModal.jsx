@@ -76,11 +76,11 @@ export function PayModal({ course, onClose, onAdminJump }) {
                 <div className="xs">课程顾问微信 · 报订单号即可快速核对到账</div>
                 <img className="advisor-qr" src="assets-claude/advisor-wechat-qr.png" alt="课程顾问微信二维码"
                      onError={(e) => { e.currentTarget.style.display='none'; }} />
-                <div className="spec">（演示二维码 · 生产环境由运营配置真实顾问码）</div>
+                <div className="spec">课程顾问微信 · 长按识别二维码</div>
               </div>
               <div className="bdg b-pending" style={{ display:'inline-block', margin:'4px 0 18px' }}>pending_review · 运营核对到账中</div>
               <button className="btn btn-fill btn-lg" style={{ width:'100%' }} onClick={() => { onClose(); location.hash = '#/member'; }}>看我的订单</button>
-              <button className="btn btn-line btn-lg" style={{ width:'100%', marginTop:10 }} onClick={() => { onClose(); if (onAdminJump) onAdminJump(); }}>（演示）以运营身份核销</button>
+              <button className="btn btn-line btn-lg" style={{ width:'100%', marginTop:10 }} onClick={() => { onClose(); if (onAdminJump) onAdminJump(); }}>以运营身份核销</button>
             </>
           ) : (
             <>

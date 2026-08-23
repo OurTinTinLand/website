@@ -15,7 +15,7 @@ const META = {
   hackathons: { kick:'Hackathons', title:'黑客松',   desc:'奖金池、赛道、评审标准、组队报名。字段结构与活动完全不同，因此独立成板块。' },
   jobs:       { kick:'Careers',    title:'招聘',     desc:'自有岗位 + 生态伙伴岗位 + 社区人才信息。数量不追求多，挂出来的都在真招。' },
   apps:       { kick:'Apps',       title:'应用工具', desc:'代理产品（云厂商代理，主推）+ 社区作品（社区自研，曝光用）。',
-                extraBanner: '本周目标是占位页：卡片结构与上架表单完整，真实产品数据由运营上线后补，不阻塞主线。',
+                extraBanner: '更多应用陆续上架中，期待你的作品。',
                 extraAction: ['申请上架', 'app'] },
 };
 

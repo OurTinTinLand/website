@@ -55,7 +55,7 @@ export function FormModal({ def, onClose, onSubmitted }) {
           fields,
         });
       }
-      toast.show('提交成功（演示：表单已写入 PB signups 集合）');
+      toast.show('提交成功 · 我们会尽快审核');
       onClose();
       if (onSubmitted) onSubmitted();
     } catch (err) {

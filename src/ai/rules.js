@@ -83,7 +83,7 @@ export const RULES = [
 
 export const FALLBACK = {
   intent:'fallback',
-  reply:'这个我还没学会（V1 是规则引擎，V1.1 才换真大模型）。你可以直接看看这几个板块，或者留言让团队来找你：',
+  reply:'这个我还没学会。你可以先看看这几个板块，或留言让团队来找你：',
   recs: () => [],
   ctas: (h) => [
     ['课程',         $n(h, 'courses'),      ],

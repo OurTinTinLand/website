@@ -35,14 +35,14 @@ export function Footer() {
           </div>
           <div>
             <h4>社群</h4>
-            <a onClick={() => toast.show('外链占位')}>X</a>
-            <a onClick={() => toast.show('外链占位')}>Telegram</a>
-            <a onClick={() => toast.show('外链占位')}>Bilibili</a>
-            <a onClick={() => toast.show('外链占位')}>YouTube</a>
+            <a onClick={() => toast.show('即将上线')}>X</a>
+            <a onClick={() => toast.show('即将上线')}>Telegram</a>
+            <a onClick={() => toast.show('即将上线')}>Bilibili</a>
+            <a onClick={() => toast.show('即将上线')}>YouTube</a>
           </div>
         </div>
         <div className="ftb">
-          <span>© 2026 TinTin · 可点击原型，视觉基于官方品牌资产，非最终生产版本</span>
+          <span>© 2026 TinTin · 全球 Web3 × AI 生态增长引擎</span>
           <span>不做论坛 · 不做电商 · 不做代币发行 · 不做强制 KYC</span>
         </div>
       </div>

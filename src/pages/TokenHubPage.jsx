@@ -56,7 +56,7 @@ export function TokenHubPage() {
         </div>
 
         <div className="spec" style={{ marginBottom:30 }}>
-          渠道名称、支持模型与价格均为占位，需运营用真实合作方信息替换（对应需求文档第 15 章问题 2）。
+          合作渠道与价格持续接入中，最新详情请联系运营。
         </div>
 
         <div className="thtabs">
@@ -102,7 +102,7 @@ export function TokenHubPage() {
               <p>运营一个工作日内联系，确认用量后线下结算并开通账号，把 key 和用量看板一起交付。</p>
             </div>
           </div>
-          <div className="spec">V1.1 规划：接入渠道商 API 后做自助下单 + 实时用量看板。本周只交付「意向单 → 人工对接」闭环。</div>
+          <div className="spec">当前为「意向单 → 人工对接」模式，自助下单与实时用量看板后续上线。</div>
         </div>
 
         {/* 3 · 提交意向 */}

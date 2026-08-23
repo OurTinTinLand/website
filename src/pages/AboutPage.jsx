@@ -39,13 +39,13 @@ export function AboutPage() {
                 </select>
               </div>
               <div className="fr"><label>想聊什么</label><textarea rows="3" placeholder="一两句话说清背景和诉求，我们回得更快"></textarea></div>
-              <button className="btn btn-fill btn-lg" style={{ width:'100%', marginTop:10 }} onClick={() => toast.show('已提交（原型演示）· 写入后台线索列表')}>提交</button>
+              <button className="btn btn-fill btn-lg" style={{ width:'100%', marginTop:10 }} onClick={() => toast.show('已提交 · 我们会在 1 个工作日内回复你')}>提交</button>
             </div>
             <div style={{ marginTop:26 }}>
               <span className="kick" style={{ marginBottom:14 }}>Follow</span>
               <div className="pills">
                 {SOCIALS.map((s) => (
-                  <button key={s} onClick={() => toast.show(`外链占位：${s}`)}>{s}</button>
+                  <button key={s} onClick={() => toast.show(`${s} 即将上线`)}>{s}</button>
                 ))}
               </div>
             </div>

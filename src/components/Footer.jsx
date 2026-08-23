@@ -43,7 +43,6 @@ export function Footer() {
         </div>
         <div className="ftb">
           <span>© 2026 TinTin · 全球 Web3 × AI 生态增长引擎</span>
-          <span>不做论坛 · 不做电商 · 不做代币发行 · 不做强制 KYC</span>
         </div>
       </div>
     </footer>

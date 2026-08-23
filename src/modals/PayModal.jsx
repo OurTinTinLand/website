@@ -70,7 +70,7 @@ export function PayModal({ course, onClose, onAdminJump }) {
               <h2 style={{ fontSize:24 }}>收到了，顾问码已发</h2>
               <p className="xs" style={{ margin:'14px 0 20px' }}>
                 订单 <span className="mono">{done.oid}</span> · 实付 ¥{money(done.amt)}{useDeposit ? '（定金）' : ''}
-                {!done.synced && <span className="lo" style={{ marginLeft:8 }}>（本地）</span>}
+                {!done.synced && <span className="lo" style={{ marginLeft:8 }}>（未同步到后端）</span>}
               </p>
               <div className="advisor-box">
                 <div className="xs">课程顾问微信 · 报订单号即可快速核对到账</div>
@@ -78,7 +78,7 @@ export function PayModal({ course, onClose, onAdminJump }) {
                      onError={(e) => { e.currentTarget.style.display='none'; }} />
                 <div className="spec">课程顾问微信 · 长按识别二维码</div>
               </div>
-              <div className="bdg b-pending" style={{ display:'inline-block', margin:'4px 0 18px' }}>pending_review · 运营核对到账中</div>
+              <div className="bdg b-pending" style={{ display:'inline-block', margin:'4px 0 18px' }}>运营核对到账中</div>
               <button className="btn btn-fill btn-lg" style={{ width:'100%' }} onClick={() => { onClose(); location.hash = '#/member'; }}>看我的订单</button>
               <button className="btn btn-line btn-lg" style={{ width:'100%', marginTop:10 }} onClick={() => { onClose(); if (onAdminJump) onAdminJump(); }}>以运营身份核销</button>
             </>
@@ -108,7 +108,7 @@ export function PayModal({ course, onClose, onAdminJump }) {
               <button className="btn btn-fill btn-lg" style={{ width:'100%', marginTop:20 }} disabled={pending} onClick={markPaid}>
                 {pending ? '处理中…' : '我已完成支付'}
               </button>
-              <div className="spec">spec §8.3：点「已支付」后系统立即把课程顾问微信码发给你，主动加好友可缩短感知等待；运营核对到账后只更新订单状态为 verified。</div>
+              <div className="spec">点「我已完成支付」后，顾问微信码会立即发给你，主动加好友可缩短感知等待；运营核对到账后会更新订单状态。</div>
             </>
           )}
 

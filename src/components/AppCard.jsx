@@ -10,7 +10,6 @@ export function AppCard({ app, onConsult }) {
       <div className="c-t">{app.name}</div>
       <p className="c-d">{app.desc}</p>
       <div className="c-f">
-        <span className="lo">示例数据</span>
         <button className="lnk" onClick={() => onConsult(app)}>咨询 <span className="arw">→</span></button>
       </div>
     </div>

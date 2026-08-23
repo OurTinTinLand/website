@@ -1,4 +1,4 @@
-// 全局常量：TODAY / 状态判断 / 封面图 / 吉祥物 / 路由映射 / 表单定义
+// 全局常量：状态判断 / 封面图 / 吉祥物 / 路由映射 / 表单定义
 import {
   COURSE_SIGNUP_FIELDS,
   COURSE_CATEGORIES,
@@ -10,12 +10,11 @@ import {
   JOB_APPLY_FIELDS,
 } from '../data/index.js';
 
-export const TODAY = new Date('2026-08-12');
-
 export const stateOf = (s, e) => {
   const a = new Date(s), b = new Date(e || s);
-  if (TODAY < a) return 'upcoming';
-  if (TODAY > b) return 'past';
+  const now = new Date();
+  if (now < a) return 'upcoming';
+  if (now > b) return 'past';
   return 'ongoing';
 };
 

@@ -31,6 +31,7 @@ export function AdminPage({ openLogin }) {
   const { go } = useRoute();
   const toast = useToast();
   const [tab, setTab] = useState('content');
+  const [pendingDeleteId, setPendingDeleteId] = useState(null);
   const role = session.role || 'member';
 
   return (
@@ -38,7 +39,7 @@ export function AdminPage({ openLogin }) {
       <div className="wrap">
         <div className="sec-h">
           <div><span className="kick">Admin</span><h2 className="t2">运营后台</h2></div>
-          <p className="lead">按运营工作流划分 6 个模块 · 本周完成 ① 内容管理 + ④ 订单核销，其余基础版。</p>
+          <p className="lead">按运营工作流划分 6 个模块。</p>
         </div>
 
         {/* 角色对应的 Tab（spec §14.6 角色 → Tab 映射）*/}
@@ -50,7 +51,7 @@ export function AdminPage({ openLogin }) {
 
         <p className="xs" style={{ color:'var(--ink-3)', marginBottom: 16 }}>
           当前身份：<code>{role}</code> · 邮箱 {session.email || '—'}
-          {role === 'super_admin' && ' · PB _superusers 自动识别'}
+          {role === 'super_admin' && ' · 全部权限'}
         </p>
 
         {!session.logged && (
@@ -163,12 +164,12 @@ function ContentCenter() {
       }
       // 用 PB 返回的真实 id 替换本地占位
       setList((prev) => prev.map((x) => x.id === saved.id ? { ...x, id: realId, _synced: true } : x));
-      toast.show(`已保存到 PocketBase · ${kindLabel(kind)}「${saved.title || '（无标题）'}」`);
+      toast.show(`已保存 · ${kindLabel(kind)}「${saved.title || '（无标题）'}」`);
       // 触发 catalog reload（让 ListPage 等其他模块也看到最新数据）
       reloadCatalog();
     } catch (err) {
       console.warn('[admin.content.save] PB failed:', err.message);
-      toast.show('PB 写入失败：' + (err.message || 'unknown') + ' · 当前仅本地可见');
+      toast.show('保存失败：' + (err.message || 'unknown') + ' · 当前仅本地可见');
     }
   };
 
@@ -186,23 +187,29 @@ function ContentCenter() {
       toast.show(`${next.state === 'off' ? '已下架' : '已上架'} · ${kindLabel(kind)}`);
       reloadCatalog();
     } catch (err) {
-      toast.show('PB 状态切换失败：' + (err.message || 'unknown'));
+      toast.show('状态切换失败：' + (err.message || 'unknown'));
     }
   };
 
   const persistRemove = async (id) => {
-    if (!confirm('确认删除？此操作会从 PocketBase 中删除该记录（不可恢复）')) return;
+    if (pendingDeleteId !== id) {
+      setPendingDeleteId(id);
+      toast.show('再次点击「确认删除」完成操作 · 5 秒后自动取消');
+      setTimeout(() => setPendingDeleteId((cur) => cur === id ? null : cur), 5000);
+      return;
+    }
+    setPendingDeleteId(null);
     const backup = list.find((x) => x.id === id);
     setList((prev) => prev.filter((x) => x.id !== id));
     try {
       const api = adminApiFor(kind);
       await api.remove(id);
-      toast.show('已从数据库删除');
+      toast.show('已删除');
       reloadCatalog();
     } catch (err) {
       // 回滚
       if (backup) setList((prev) => [backup, ...prev]);
-      toast.show('PB 删除失败：' + (err.message || 'unknown'));
+      toast.show('删除失败：' + (err.message || 'unknown'));
     }
   };
 
@@ -227,7 +234,7 @@ function ContentCenter() {
         + 新建{kindLabel(kind)}
       </button>
 
-      <ContentList kind={kind} list={list} onEdit={setEditing} onToggleState={persistToggleState} onRemove={persistRemove} />
+      <ContentList kind={kind} list={list} pendingDeleteId={pendingDeleteId} onEdit={setEditing} onToggleState={persistToggleState} onRemove={persistRemove} />
 
       {editing && (
         <ContentEditModal
@@ -374,7 +381,7 @@ function slim(x) {
   };
 }
 
-function ContentList({ kind, list, onEdit, onToggleState, onRemove }) {
+function ContentList({ kind, list, pendingDeleteId, onEdit, onToggleState, onRemove }) {
   // toggleState / remove 都由父组件 persistToggleState / persistRemove 实现，
   // 这里只做 UI 触发，PB 调用与乐观更新都在父层
   const toggleState = (id) => onToggleState(id);
@@ -412,7 +419,9 @@ function ContentList({ kind, list, onEdit, onToggleState, onRemove }) {
                 <button className="lnk" style={{ marginLeft:10 }} onClick={() => toggleState(x.id)}>
                   {x.state === 'off' ? '上架' : '下架'}
                 </button>
-                <button className="lnk" style={{ marginLeft:10, color:'var(--danger, #c33)' }} onClick={() => remove(x.id)}>删除</button>
+                <button className="lnk" style={{ marginLeft:10, color:'var(--danger, #c33)', fontWeight: pendingDeleteId === x.id ? 700 : 400 }} onClick={() => remove(x.id)}>
+                  {pendingDeleteId === x.id ? '确认删除' : '删除'}
+                </button>
               </td>
             </tr>
           ))}
@@ -476,11 +485,11 @@ function ContentEditModal({ def, kind, onClose, onSave }) {
 
           <hr className="hr-soft" />
 
-          <div className="spec">spec §14.2：报名审核开关 + 字段必选/可选</div>
+          <div className="spec">报名审核开关 + 字段必选/可选</div>
           <div className="fr"><label>报名是否需审核</label>
             <label className="ck">
               <input type="checkbox" checked={!!draft.review_required} onChange={(e) => set('review_required', e.target.checked)} />
-              开启审核（公开课程可不开启，仅用于建立用户数据库）
+              开启审核（公开课程可不开启）
             </label>
           </div>
 
@@ -639,7 +648,7 @@ function OrdersOps() {
   return (
     <>
       <div className="spec" style={{ marginBottom:18 }}>
-        spec §8.3：用户下单后联系码已立即发放，运营只更新订单状态为 verified；如联系码自动发送失败，可在此手动补发。
+        用户下单后联系码已立即发放，运营只更新订单状态；如联系码自动发送失败，可在此手动补发。
       </div>
       <div className="tbl-scroll">
         <table className="t">
@@ -657,7 +666,9 @@ function OrdersOps() {
                 <td className="mono xs">{o.advisor_code_sent_at || '—'}</td>
                 <td>{o.resend_count || 0}</td>
                 <td>
-                  <span className={'bdg ' + (o.status === 'verified' ? 'b-verified' : o.status === 'failed' ? 'b-failed' : 'b-pending')}>{o.status}</span>
+                  <span className={'bdg ' + (o.status === 'verified' ? 'b-verified' : o.status === 'failed' ? 'b-failed' : 'b-pending')}>
+                    {o.status === 'verified' ? '已核实' : o.status === 'failed' ? '失败' : '待核实'}
+                  </span>
                 </td>
                 <td style={{ whiteSpace:'nowrap' }}>
                   {o.status === 'pending_review'
@@ -679,7 +690,7 @@ function UserOps() {
   return (
     <>
       <div className="spec" style={{ marginBottom:18 }}>
-        spec §14.6：5 种角色（super_admin / content_ops / reviewer / customer_support / member），见 user_profiles.role。
+        5 种角色：超级管理员 / 内容运营 / 审核员 / 客服 / 普通用户
       </div>
       <div className="grid g2">
         <div className="card-ops"><h4>超级管理员</h4><p>全部权限</p></div>
@@ -696,7 +707,7 @@ function NotifyConfig() {
   return (
     <>
       <div className="spec" style={{ marginBottom:18 }}>
-        spec §14.7：审核通过 / 订单核实 / 活动提醒等系统通知文案，由运营维护，不需要每次改动找开发。
+        审核通过、订单核实、活动提醒等系统通知文案，运营可直接修改。
       </div>
       <div className="fcard" style={{ maxWidth:680 }}>
         <div className="fr"><label>审核通过</label>

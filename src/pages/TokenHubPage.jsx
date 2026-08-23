@@ -94,7 +94,7 @@ export function TokenHubPage() {
             <div className="stp">
               <div className="n">Step 02</div>
               <h4>提交意向</h4>
-              <p>填预计用量与联系方式。本周不接自动扣费——资金与额度风控一周做不扎实，先用人工方式把商业闭环跑通。</p>
+              <p>填预计用量与联系方式，我们 1 个工作日内联系你。</p>
             </div>
             <div className="stp">
               <div className="n">Step 03</div>

@@ -104,7 +104,7 @@ function TrailTab({ signups }) {
                 <td>{STATUS_LABEL[s.kind] || s.kind}</td>
                 <td>{s.title}</td>
                 <td className="mono">{s.time}</td>
-                <td><span className="bdg b-verified">{s.status}</span></td>
+                <td><span className="bdg b-verified">{s.status === 'pending' ? '待审核' : s.status === 'verified' ? '已通过' : s.status === 'failed' ? '已拒绝' : s.status}</span></td>
               </tr>
             ))}
           </tbody>
@@ -159,11 +159,13 @@ function OrdersTab({ mine }) {
                 <td>¥{money(o.amount)}{o.is_deposit ? <span className="lo" style={{ marginLeft:6 }}>定金</span> : null}</td>
                 <td><span className="xs">工行聚合</span></td>
                 <td>
-                  <span className={'bdg ' + (o.status === 'verified' ? 'b-verified' : o.status === 'failed' ? 'b-failed' : 'b-pending')}>{o.status}</span>
+                  <span className={'bdg ' + (o.status === 'verified' ? 'b-verified' : o.status === 'failed' ? 'b-failed' : 'b-pending')}>
+                    {o.status === 'verified' ? '已核实' : o.status === 'failed' ? '失败' : '待核实'}
+                  </span>
                 </td>
                 <td>
                   {o.advisor_code_sent
-                    ? <button className="lnk" onClick={() => alert('顾问微信二维码将在发放后展示')}>查看 →</button>
+                    ? <button className="lnk" onClick={() => toast.show('顾问微信二维码将在发放后展示')}>查看 →</button>
                     : <span className="xs">未发放</span>}
                 </td>
               </tr>

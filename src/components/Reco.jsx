@@ -8,10 +8,10 @@ import { Card } from './Card';
 const ST_RANK = { upcoming: 0, ongoing: 1, past: 2 };
 
 function stateOf(s, e) {
-  const TODAY = new Date('2026-08-12');
   const a = new Date(s), b = new Date(e || s);
-  if (TODAY < a) return 'upcoming';
-  if (TODAY > b) return 'past';
+  const now = new Date();
+  if (now < a) return 'upcoming';
+  if (now > b) return 'past';
   return 'ongoing';
 }
 

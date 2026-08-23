@@ -6,6 +6,7 @@
 #   - PocketBase 自己 serve 静态文件（pb_public）+ API（/api/* + /_/*）
 #   - 不再有 Node 反代层，所有 API 浏览器同源调用
 #   - onServe 钩子（inject_secrets.pb.js）注入 window.PB_ADMIN_DEMO_SECRET
+#   - 边缘层（Cloudflare）做 gzip/brotli 压缩；PocketBase 直出不压缩
 #
 # 部署架构对比：
 #   - 老 Dockerfile：node builder + alpine runtime（含 node + pb 两个进程 + 反代层）
@@ -44,7 +45,7 @@ COPY . .
 # build.js 负责：
 #   - 把 index.html / src/styles / assets-claude 拷到 backend/pb_public/
 #   - esbuild 把 src/App.jsx 编译到 backend/pb_public/dist/bundle.js
-#   - postbuild.js 把 esm.sh 的 React 引用替换为 window.React
+#   - postbuild.js v1.3 起是 no-op（依赖全本地化，不再需要 esm.sh rewrite）
 RUN npm run build
 
 # ---- Stage 2: 运行时（alpine + pocketbase）----

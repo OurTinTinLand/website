@@ -5,7 +5,6 @@
 //   （前端 ListPage / DetailModal 都不渲染联系方式，由后端 API 抹除双重保险）
 // - 招聘详情：按 §15.1 contact 字段不展示
 import React from 'react';
-import { courses, events, hackathons, jobs } from '../data/index.js';
 import { stateOf, ST } from '../utils/constants';
 import { money, platformOf, dateOnly } from '../utils/format';
 
@@ -182,23 +181,23 @@ function JobDetail({ j, onSignup }) {
   );
 }
 
-export function DetailModal({ kind, id, onClose, onSignup, onPay, onToast }) {
+export function DetailModal({ kind, id, data, onClose, onSignup, onPay, onToast }) {
   if (!kind || !id) return null;
   let body = null;
   if (kind === 'courses') {
-    const c = courses.find((x) => x.id === id);
+    const c = data.courses.find((x) => x.id === id);
     if (!c) return null;
     body = <CourseDetail c={c} onSignup={onSignup} onPay={onPay} onToast={onToast} />;
   } else if (kind === 'events') {
-    const e = events.find((x) => x.id === id);
+    const e = data.events.find((x) => x.id === id);
     if (!e) return null;
     body = <EventDetail e={e} onSignup={onSignup} onToast={onToast} />;
   } else if (kind === 'hackathons') {
-    const h = hackathons.find((x) => x.id === id);
+    const h = data.hackathons.find((x) => x.id === id);
     if (!h) return null;
     body = <HackDetail h={h} onSignup={onSignup} onToast={onToast} />;
   } else if (kind === 'jobs') {
-    const j = jobs.find((x) => x.id === id);
+    const j = data.jobs.find((x) => x.id === id);
     if (!j) return null;
     body = <JobDetail j={j} onSignup={onSignup} />;
   } else {

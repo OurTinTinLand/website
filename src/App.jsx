@@ -109,6 +109,7 @@ function Shell() {
         <DetailModal
           kind={page}
           id={detailId}
+          data={{ courses, events, hackathons, jobs }}
           onClose={() => go(page)}
           onSignup={handleSignup}
           onPay={(courseId) => { if (!session.logged) { openLogin(() => openPay(courseId)); return; } openPay(courseId); }}

@@ -3,7 +3,7 @@
 // spec v1.1：课程卡片展示 subcategory 与 tags；活动保留 spec §7.2 标签；黑客松保持奖金池
 import React, { Fragment } from 'react';
 import { stateOf, ST } from '../utils/constants';
-import { money } from '../utils/format';
+import { money, dateOnly } from '../utils/format';
 
 function CourseCard({ c, onOpen }) {
   const s = stateOf(c.start_at, c.end_at);
@@ -39,8 +39,9 @@ function CourseCard({ c, onOpen }) {
 
 function EventCard({ e, onOpen }) {
   const s = stateOf(e.start_at, e.end_at);
-  const mmdd = (e.start_at || '').slice(5).replace('-', '.');
-  const yr = (e.start_at || '').slice(0, 4);
+  const d = dateOnly(e.start_at);
+  const mmdd = d.slice(5).replace('-', '.');
+  const yr = d.slice(0, 4);
   return (
     <div className="card" onClick={() => onOpen(e.id)}>
       <div className="c-top">
@@ -70,7 +71,7 @@ function HackCard({ h, onOpen }) {
       <div className="c-t" style={{ marginTop:10 }}>{h.title}</div>
       <p className="c-d">{h.tracks.map((t) => t.name).join(' · ')}</p>
       <div className="c-f">
-        <span className="lo">截止 {h.deadline}</span>
+        <span className="lo">截止 {dateOnly(h.deadline)}</span>
         <span className="lo">{h.content_source === 'external_link' ? '外链 ↗' : '详情 →'}</span>
       </div>
     </div>

@@ -7,7 +7,7 @@
 import React from 'react';
 import { courses, events, hackathons, jobs } from '../data/index.js';
 import { stateOf, ST } from '../utils/constants';
-import { money, platformOf } from '../utils/format';
+import { money, platformOf, dateOnly } from '../utils/format';
 
 function MetaRow({ items }) {
   return <div className="meta">{items.map((t, i) => <span key={i}>{t}</span>)}</div>;
@@ -41,7 +41,7 @@ function CourseDetail({ c, onSignup, onPay, onToast }) {
         <span className={'st ' + s}>{ST[s]}</span>
       </div>
       <h2>{c.title}</h2>
-      <MetaRow items={[c.difficulty, c.form, `${c.start_at} 开课`, `讲师 ${c.teacher}`]} />
+      <MetaRow items={[c.difficulty, c.form, `${dateOnly(c.start_at)} 开课`, `讲师 ${c.teacher}`]} />
 
       {c.tags && c.tags.length > 0 && (
         <div className="c-tags" style={{ margin:'12px 0 6px' }}>
@@ -95,7 +95,7 @@ function EventDetail({ e, onSignup, onToast }) {
         <span className={'st ' + s}>{ST[s]}</span>
       </div>
       <h2>{e.title}</h2>
-      <MetaRow items={[e.type, e.city, e.start_at + (e.end_at !== e.start_at ? ` – ${e.end_at}` : '')]} />
+      <MetaRow items={[e.type, e.city, dateOnly(e.start_at) + (e.end_at !== e.start_at ? ` – ${dateOnly(e.end_at)}` : '')]} />
       <p className="sm">{e.desc}</p>
       {e.agenda.length ? (
         <>
@@ -133,7 +133,7 @@ function HackDetail({ h, onSignup, onToast }) {
       <div className="xs">总奖金池</div>
       <div className="pool" style={{ fontSize:'clamp(38px,6vw,60px)' }}>${money(h.prize_pool_usd)}</div>
       <h2 style={{ marginTop:14 }}>{h.title}</h2>
-      <MetaRow items={[`${h.start_at} – ${h.end_at}`, `报名截止 ${h.deadline}`, `${h.tracks.length} 条赛道`]} />
+      <MetaRow items={[`${dateOnly(h.start_at)} – ${dateOnly(h.end_at)}`, `报名截止 ${dateOnly(h.deadline)}`, `${h.tracks.length} 条赛道`]} />
       <p className="sm">{h.desc}</p>
       <div className="kick" style={{ margin:'30px 0 6px' }}>Tracks</div>
       {h.tracks.map((t, i) => <div key={i} className="trk"><span>{t.name}</span><b>${money(t.prize)}</b></div>)}

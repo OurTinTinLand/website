@@ -8,10 +8,10 @@ import { dogUrl } from '../utils/constants';
 // spec §5：快捷 chip
 const CHIPS = [
   '推荐一门课',
-  '最近有什么黑客松',
-  '找生态工作',
-  '了解 Token Hub',
-  '随便看看',
+  '最近的黑客松',
+  '生态里的工作',
+  '买大模型 token',
+  '先随便看看',
 ];
 
 // spec §5：初始气泡

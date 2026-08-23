@@ -15,7 +15,6 @@ const META = {
   hackathons: { kick:'Hackathons', title:'黑客松',   desc:'奖金池、赛道、评审标准、组队报名。' },
   jobs:       { kick:'Careers',    title:'招聘',     desc:'自有岗位 + 生态伙伴岗位 + 社区人才信息。' },
   apps:       { kick:'Apps',       title:'应用工具', desc:'代理产品 + 社区作品。',
-                extraBanner: '更多应用陆续上架中，期待你的作品。',
                 extraAction: ['申请上架', 'app'] },
 };
 
@@ -90,20 +89,19 @@ export function ListPage({ kind, onOpen, onApply, onConsult }) {
             <h2 className="t2">{meta.title}</h2>
           </div>
           <p className="lead">{meta.desc}</p>
-          {meta.extraAction && (
-            <button className="btn btn-line" onClick={() => onApply(meta.extraAction[1])}>{meta.extraAction[0]}</button>
-          )}
         </div>
-
-        {meta.extraBanner && (
-          <div className="banner"><span>ℹ</span><div>{meta.extraBanner}</div></div>
-        )}
 
         {catalog?._source === 'fallback' && (
           <div className="banner"><span>ℹ</span><div>内容可能不是最新版本，请刷新页面重试</div></div>
         )}
 
         <ListFilters kind={kind} filter={filter} setFilter={setFilter} categories={cats} />
+
+        {meta.extraAction && (
+          <div style={{ margin: '18px 0 26px' }}>
+            <button className="btn btn-line" onClick={() => onApply(meta.extraAction[1])}>{meta.extraAction[0]}</button>
+          </div>
+        )}
 
         {items.length === 0 ? (
           <div className="empty">

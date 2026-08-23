@@ -38,7 +38,6 @@ export function HomePage() {
               <span className="kick">For You</span>
               <h2 className="t2">为你推荐</h2>
             </div>
-            <p className="lead">你在对话里说过的方向会被顶到最前。没说的话，默认按「即将开始 &gt; 进行中 &gt; 已结束」排。</p>
           </div>
           <Reco onOpen={(kind, id) => go(`${kind}/${id}`)} />
         </div>

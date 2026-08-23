@@ -56,14 +56,12 @@ function CourseDetail({ c, onSignup, onPay, onToast }) {
             {c.outline.map(([a, b], i) => <li key={i}><b>{a}</b><span>{b}</span></li>)}
           </ul>
         </>
-      ) : (
-        <div className="spec">历史内容按需求 7.6 第一步处理：卡片 + 外链跳转，不搬运内容。</div>
-      )}
+      ) : null}
 
       {!isExt && (
         <div className="spec" style={{ marginTop:16 }}>
-          本课程报名{c.signup_review_required ? '需要审核' : '无需审核（公开）'} ·
-          表单共 {requiredCount || '—'} 个必填字段（由运营在后台可调）
+          本课程报名{c.signup_review_required ? '需要审核' : '无需审核'} ·
+          表单共 {requiredCount || '—'} 个必填字段
         </div>
       )}
 
@@ -101,9 +99,7 @@ function EventDetail({ e, onSignup, onToast }) {
           <div className="kick" style={{ margin:'30px 0 6px' }}>Agenda</div>
           <ul className="olist">{e.agenda.map(([a, b], i) => <li key={i}><b>{a}</b><span>{b}</span></li>)}</ul>
         </>
-      ) : (
-        <div className="spec">历史活动按需求 7.6 第一步处理：卡片 + 跳转 Luma 原始页。</div>
-      )}
+      ) : null}
       {!isExt && (
         <div className="spec" style={{ marginTop:16 }}>
           本活动报名{e.signup_review_required ? '需要审核' : '无需审核'}
@@ -141,14 +137,12 @@ function HackDetail({ h, onSignup, onToast }) {
           <div className="kick" style={{ margin:'30px 0 6px' }}>Judging</div>
           {h.judging.map(([a, b], i) => <div key={i} className="trk"><span>{a}</span><b>{b}</b></div>)}
         </>
-      ) : (
-        <div className="spec">历史赛事按 7.6 第一步处理：卡片 + 外链跳转。</div>
-      )}
+      ) : null}
 
       {!isExt && (
         <div className="spec" style={{ marginTop:16 }}>
           本赛事报名{h.signup_review_required ? '需要审核' : '无需审核'} ·
-          公开团队列表仅展示团队名与成员昵称，不展示手机号/邮箱（spec §15.4 隐私原则）
+          公开团队列表仅展示团队名与成员昵称，不展示手机号或邮箱
         </div>
       )}
 
@@ -172,7 +166,7 @@ function JobDetail({ j, onSignup }) {
       <div className="kick" style={{ margin:'30px 0 6px' }}>Requirements</div>
       <ul className="olist">{j.reqs.map((r, i) => <li key={i}><b>{`0${i+1}`}</b><span>{r}</span></li>)}</ul>
       <div className="spec" style={{ marginTop:16 }}>
-        联系方式由平台代为触达（spec §15.1），企业联系后由运营转接，不会直接展示在前台。
+        联系方式由平台代为触达，企业联系后由我们转接，不会直接展示在前台。
       </div>
       <div style={{ marginTop:24 }}>
         <button className="btn btn-fill btn-lg" style={{ width:'100%' }} onClick={() => onSignup('job', j.id)}>投递简历</button>

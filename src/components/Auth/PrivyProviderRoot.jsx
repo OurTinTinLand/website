@@ -139,8 +139,6 @@ function PrivyNativeLauncher() {
           persist.flushState('session');
           console.warn('[AUTH-DEBUG] flushState(session) done');
         } catch (_) {}
-        window.dispatchEvent(new CustomEvent('app:auth:login', { detail: data }));
-        console.warn('[AUTH-DEBUG] dispatched app:auth:login');
         return true;
       }
       return false;

@@ -113,7 +113,7 @@ function Shell() {
           onClose={() => go(page)}
           onSignup={handleSignup}
           onPay={(courseId) => { if (!session.logged) { openLogin(() => openPay(courseId)); return; } openPay(courseId); }}
-          onToast={(msg) => { window.dispatchEvent(new CustomEvent('app:toast', { detail: msg })); }}
+          onToast={(msg) => toast.show(msg)}
         />
       )}
 

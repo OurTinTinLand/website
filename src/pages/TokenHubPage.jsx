@@ -52,7 +52,7 @@ export function TokenHubPage() {
             <span className="kick">Token Hub</span>
             <h2 className="t2">Token Hub</h2>
           </div>
-          <p className="lead">大模型 API token 的渠道代理与对接。说清楚：这里是大模型 token，不是发币。</p>
+          <p className="lead">大模型 API token 的渠道代理与对接。</p>
         </div>
 
         <div className="spec" style={{ marginBottom:30 }}>

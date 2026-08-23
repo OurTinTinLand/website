@@ -39,7 +39,7 @@ export function EnterprisePage({ onApply, onGoto }) {
 
           <div className="sec-h" style={{ marginBottom:26 }}>
             <div><span className="kick">Methodology</span><h2 className="t3">我们怎么做</h2></div>
-            <p className="lead">四个阶段构成闭环，每个阶段都有能验收的交付物。</p>
+            <p className="lead">四个阶段构成闭环，每个阶段都有清晰的交付物。</p>
           </div>
 
           <div className="flow" style={{ marginBottom:'clamp(48px,6vw,80px)' }}>
@@ -58,13 +58,13 @@ export function EnterprisePage({ onApply, onGoto }) {
 
           <div className="grid" style={{ marginBottom:'clamp(48px,6vw,80px)' }}>
             <div className="card no-card">
-              <div className="c-top"><span className="c-cat">AI 方向主推</span></div>
+              <div className="c-top"><span className="c-cat">AI 方向</span></div>
               <div className="c-t">AI 转型咨询</div>
-              <p className="c-d">现状诊断、场景筛选与 ROI 测算、定制内训、落地陪跑。团队有专职 FDE，交付的是能验收的业务指标改善。</p>
+              <p className="c-d">现状诊断、场景筛选与 ROI 测算、定制内训、落地陪跑。团队有专职 FDE，交付的是可量化的业务指标改善。</p>
               <div className="c-f"><button className="lnk" onClick={() => onApply('enterprise-ai')}>联系顾问 <span className="arw">→</span></button></div>
             </div>
             <div className="card no-card">
-              <div className="c-top"><span className="c-cat">存量优势</span></div>
+              <div className="c-top"><span className="c-cat">生态合作</span></div>
               <div className="c-t">生态合作全案</div>
               <p className="c-d">社区运营、活动与大会、KOL 对接、战略合作四大模块。含 4A 级视觉体系与跨境执行，覆盖融资期到 TGE 后全周期。</p>
               <div className="c-f"><button className="lnk" onClick={() => onApply('enterprise-eco')}>获取方案 <span className="arw">→</span></button></div>

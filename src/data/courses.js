@@ -29,7 +29,7 @@ export const courses = [
                           region:'required', role:'required', tech_bg:'required',
                           age:'optional', edu:'optional', notify:'optional' },
    teacher:'企业 AI 转型交付团队',
-   desc:'面向想转型做企业 AI 落地顾问的学员：怎么做转型诊断、怎么设计陪跑方案、怎么把交付结果量化成企业能验收的指标。',
+   desc:'面向想转型做企业 AI 落地顾问的学员：怎么做转型诊断、怎么设计陪跑方案、怎么把交付结果转化为企业可量化的业务指标。',
    outline:[['M1','企业 AI 成熟度诊断方法论'],['M2','场景筛选与 ROI 测算'],['M3','陪跑方案设计与交付验收'],['M4','真实客户案例复盘']]},
 
   {id:'c3',title:'AI 应用开发工作坊（每周直播）',

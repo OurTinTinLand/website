@@ -10,11 +10,11 @@ import { JobCard } from '../components/JobCard';
 import { AppCard } from '../components/AppCard';
 
 const META = {
-  courses:    { kick:'Courses',    title:'课程',     desc:'AI 应用 / AI Agent·FDE / AI 短剧 / Web3 技术（Web3 展开 6 子类）。状态按时间自动判断。' },
-  events:     { kick:'Events',     title:'活动',     desc:'Meetup / AMA / Workshop / 中国行与全球行。内容型运营，与竞赛型的黑客松分开管理。' },
-  hackathons: { kick:'Hackathons', title:'黑客松',   desc:'奖金池、赛道、评审标准、组队报名。字段结构与活动完全不同，因此独立成板块。' },
-  jobs:       { kick:'Careers',    title:'招聘',     desc:'自有岗位 + 生态伙伴岗位 + 社区人才信息。数量不追求多，挂出来的都在真招。' },
-  apps:       { kick:'Apps',       title:'应用工具', desc:'代理产品（云厂商代理，主推）+ 社区作品（社区自研，曝光用）。',
+  courses:    { kick:'Courses',    title:'课程',     desc:'AI 应用 / AI Agent·FDE / AI 短剧 / Web3 技术。' },
+  events:     { kick:'Events',     title:'活动',     desc:'Meetup / AMA / Workshop / 中国行与全球行。' },
+  hackathons: { kick:'Hackathons', title:'黑客松',   desc:'奖金池、赛道、评审标准、组队报名。' },
+  jobs:       { kick:'Careers',    title:'招聘',     desc:'自有岗位 + 生态伙伴岗位 + 社区人才信息。' },
+  apps:       { kick:'Apps',       title:'应用工具', desc:'代理产品 + 社区作品。',
                 extraBanner: '更多应用陆续上架中，期待你的作品。',
                 extraAction: ['申请上架', 'app'] },
 };

@@ -42,7 +42,7 @@ export function Footer() {
           </div>
         </div>
         <div className="ftb">
-          <span>© 2026 TinTin · 全球 Web3 × AI 生态增长引擎</span>
+          <span>© {new Date().getFullYear()} TinTin · 全球 Web3 × AI 生态增长引擎</span>
         </div>
       </div>
     </footer>

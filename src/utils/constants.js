@@ -104,7 +104,7 @@ export const FORM_DEF = {
   },
   'talent-post': {
     title:'发布人才信息',
-    fields: [['nickname','姓名或昵称（允许昵称）'],['expected_role','期望职位方向'],['work_experience','工作经历'],['skill_tags','技能标签 · 英文逗号分隔'],['contact','联系方式（仅运营可见，企业通过平台联系你）'],['resume_url','简历 / 个人主页链接（可选）'],['bio','自我介绍（可选）'],['expected_salary','期望薪资（可选）'],['expected_city','期望工作城市（可选）']],
+    fields: [['nickname','姓名或昵称（允许昵称）'],['expected_role','期望职位方向'],['work_experience','工作经历'],['skill_tags','技能标签 · 英文逗号（,）分隔，中文逗号也兼容'],['contact','联系方式（仅运营可见，企业通过平台联系你）'],['resume_url','简历 / 个人主页链接（可选）'],['bio','自我介绍（可选）'],['expected_salary','期望薪资（可选）'],['expected_city','期望工作城市（可选）']],
     source:'talent-post',
   },
   'talent-contact': {

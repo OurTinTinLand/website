@@ -561,8 +561,8 @@ function ContentEditModal({ def, kind, onClose, onSave }) {
             </>
           )}
 
-          <div className="fr"><label>自定义标签 · 英文逗号分隔</label>
-            <input value={(draft.tags || []).join(',')} onChange={(e) => set('tags', e.target.value.split(',').map((s) => s.trim()).filter(Boolean))} placeholder="Solidity,EVM,审计" />
+          <div className="fr"><label>自定义标签 · 英文逗号（,）分隔，中文逗号也兼容</label>
+            <input value={(draft.tags || []).join(',')} onChange={(e) => set('tags', e.target.value.split(/[,，]/).map((s) => s.trim()).filter(Boolean))} placeholder="Solidity,EVM,审计" />
           </div>
 
           {kind === 'job_postings' && (
@@ -589,8 +589,8 @@ function ContentEditModal({ def, kind, onClose, onSave }) {
               <div className="fr"><label>昵称</label><input value={draft.nickname || ''} onChange={(e) => set('nickname', e.target.value)} /></div>
               <div className="fr"><label>期望职位方向</label><input value={draft.expected_role || ''} onChange={(e) => set('expected_role', e.target.value)} /></div>
               <div className="fr"><label>工作经历</label><textarea value={draft.work_experience || ''} onChange={(e) => set('work_experience', e.target.value)} /></div>
-              <div className="fr"><label>技能标签 · 英文逗号分隔</label>
-                <input value={(draft.skill_tags || []).join(',')} onChange={(e) => set('skill_tags', e.target.value.split(',').map((s) => s.trim()).filter(Boolean))} placeholder="React,Solidity" />
+              <div className="fr"><label>技能标签 · 英文逗号（,）分隔，中文逗号也兼容</label>
+                <input value={(draft.skill_tags || []).join(',')} onChange={(e) => set('skill_tags', e.target.value.split(/[,，]/).map((s) => s.trim()).filter(Boolean))} placeholder="React,Solidity" />
               </div>
               <div className="fr"><label>联系方式（仅后台可见）</label><input value={draft.contact || ''} onChange={(e) => set('contact', e.target.value)} /></div>
               <div className="fr"><label>简历 / 主页链接</label><input value={draft.resume_url || ''} onChange={(e) => set('resume_url', e.target.value)} placeholder="https://" /></div>
@@ -687,7 +687,7 @@ function HomeOps() {
     [q[i], q[j]] = [q[j], q[i]];
     return q;
   });
-  const saveWall = () => saveHomeOp('logo_wall', wall.map((g) => [String(g[0]).trim(), g[1] || '#5F23F0', String(g[2]).split(',').map((s) => s.trim()).filter(Boolean)]));
+  const saveWall = () => saveHomeOp('logo_wall', wall.map((g) => [String(g[0]).trim(), g[1] || '#5F23F0', String(g[2]).split(/[,，]/).map((s) => s.trim()).filter(Boolean)]));
 
   // —— 置顶 ——
   const pickPool = {
@@ -725,7 +725,7 @@ function HomeOps() {
         {/* Logo 墙 */}
         <div className="card-ops">
           <h4>合作项目 Logo 墙</h4>
-          <p className="xs">分组名 + 颜色 + 名称（英文逗号分隔）。支持增删与上下排序。</p>
+          <p className="xs">分组名 + 颜色 + 名称（英文逗号（,）分隔，中文逗号也兼容）。支持增删与上下排序。</p>
           {wall.map((g, i) => (
             <div key={i} className="fcard" style={{ marginBottom:10 }}>
               <div className="fr"><label>分组 {i + 1}</label>

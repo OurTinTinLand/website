@@ -66,7 +66,7 @@ export function FormModal({ def, onClose, onSubmitted }) {
           nickname: vals.nickname || '',
           expected_role: vals.expected_role || '',
           work_experience: vals.work_experience || '',
-          skill_tags: String(vals.skill_tags || '').split(',').map((s) => s.trim()).filter(Boolean),
+          skill_tags: String(vals.skill_tags || '').split(/[,，]/).map((s) => s.trim()).filter(Boolean),
           contact: vals.contact || '',
           resume_url: vals.resume_url || '',
           bio: vals.bio || '',

@@ -42,8 +42,9 @@ function copyFileSync(src, dst) {
 }
 
 // ---- 1) 把静态资源拷到 backend/pb_public/ ----
-console.log('[build] copying index.html / styles / assets-claude → backend/pb_public/');
+console.log('[build] copying index.html / styles / assets-claude / manifest → backend/pb_public/');
 copyFileSync(path.join(ROOT, 'index.html'),                path.join(PUBLIC, 'index.html'));
+copyFileSync(path.join(ROOT, 'manifest.webmanifest'),      path.join(PUBLIC, 'manifest.webmanifest'));
 if (fs.existsSync(path.join(ROOT, 'src', 'styles'))) {
   copyDirSync(path.join(ROOT, 'src', 'styles'),             path.join(PUBLIC, 'src', 'styles'));
 }

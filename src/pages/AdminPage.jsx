@@ -31,7 +31,6 @@ export function AdminPage({ openLogin }) {
   const { go } = useRoute();
   const toast = useToast();
   const [tab, setTab] = useState('content');
-  const [pendingDeleteId, setPendingDeleteId] = useState(null);
   const role = session.role || 'member';
 
   return (
@@ -131,6 +130,7 @@ function ContentCenter() {
   const [kind, setKind] = useState('courses');
   const [list, setList] = useState(() => initialList('courses', catalog));
   const [editing, setEditing] = useState(null);
+  const [pendingDeleteId, setPendingDeleteId] = useState(null);
 
   // 每次 catalog 重新加载（来自 PB）后，同步回填当前 kind 的本地列表
   useEffect(() => {

@@ -68,6 +68,19 @@ onRecordUpdateRequest(function(e) {
     e.next();
 }, "signups");
 
+// talent_profiles（spec §15.2 社区用户发布人才信息）：
+//   登录用户可创建（schema createRule 已放开），强制默认值，新发布默认进入待审核
+onRecordCreateRequest(function(e) {
+    var r = e.record;
+    if (!r.getString("user_email")) throw new BadRequestError("user_email 必填");
+    if (!r.getString("nickname"))    throw new BadRequestError("nickname 必填");
+    if (!r.getString("contact"))     throw new BadRequestError("contact 必填（仅运营可见）");
+    r.set("status", r.getString("status") || "looking");
+    r.set("review_status", r.getString("review_status") || "pending_review");
+    r.set("published", r.getBool("published") || false);
+    e.next();
+}, "talent_profiles");
+
 // leads 保持原样
 onRecordCreateRequest(function(e) {
     var r = e.record;

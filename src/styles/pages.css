@@ -93,4 +93,14 @@
 /* 首页 For You 容器 */
 .recoWrap{display:flex;flex-direction:column;gap:clamp(40px,5vw,66px);}
 
+/* 首页「最新动态」时间线（spec §7.2：活动+黑客松打通展示） */
+.feed{display:flex;flex-direction:column;border:1.8px solid var(--ink);border-radius:var(--r-md);overflow:hidden;background:var(--surface);box-shadow:var(--pop-sm);}
+.feed-row{display:grid;grid-template-columns:96px 92px 1fr auto;gap:14px;align-items:center;padding:14px 18px;border-bottom:1px solid var(--line);cursor:pointer;transition:.14s;}
+.feed-row:last-child{border-bottom:none;}
+.feed-row:hover{background:var(--lilac-50);}
+.feed-date{font-family:var(--f-mono);font-size:12px;color:var(--ink-3);}
+.feed-kind{font-size:11px;font-weight:700;border:1.4px solid var(--ink);border-radius:var(--r-pill);padding:2px 8px;text-align:center;}
+.feed-title{font-weight:600;font-size:14.5px;}
+@media(max-width:760px){.feed-row{grid-template-columns:1fr;gap:6px;}}
+
 /* ============ table.t 注入（在 layout.css 中已声明；这里延伸为基本数据态） ============ */

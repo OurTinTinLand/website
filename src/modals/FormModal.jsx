@@ -1,11 +1,13 @@
 // 通用场景化表单弹层：基于 FORM_DEF 下划线输入
 // V1.1 真实接入：addSignup → PB /api/collections/signups/records（带 review_status）
+// §15.2：talent-post 直接创建 talent_profiles（登录用户，进入待审核）
 import React, { useState, useEffect } from 'react';
 import { FORM_DEF } from '../utils/constants';
 import { useStore, useToast } from '../state/store';
+import * as PB from '../utils/pb-client.js';
 
 export function FormModal({ def, onClose, onSubmitted }) {
-  const { session, saveProfile, addSignup } = useStore();
+  const { session, saveProfile, addSignup, reloadCatalog } = useStore();
   const toast = useToast();
 
   const meta = def ? FORM_DEF[def.kind] : null;
@@ -42,18 +44,38 @@ export function FormModal({ def, onClose, onSubmitted }) {
       if (vals.github) saveProfile({ github: vals.github });
 
       // 业务写入：signups 表
-      if (['course','event','hackathon','job'].includes(def.kind)) {
+      if (['course','event','hackathon','job','job-posting','talent-contact'].includes(def.kind)) {
         const fields = { ...vals };
         delete fields.name; delete fields.email;
         await addSignup({
           user_id: session.user_id || '',
           kind: def.kind,
-          item_id: def.id,
+          item_id: def.id || '',
           title: def.itemTitle || '—',
           time: new Date().toISOString().slice(0, 19).replace('T', ' '),
           status: '待审核',
           fields,
         });
+      } else if (def.kind === 'talent-post') {
+        // §15.2 社区用户发布人才信息 → talent_profiles（待审核）
+        if (!session.logged) throw new Error('请先登录');
+        const slug = 't-' + Date.now().toString(36);
+        await PB.createRecord('talent_profiles', {
+          user_id: session.user_id || '',
+          user_email: session.email || '',
+          nickname: vals.nickname || '',
+          expected_role: vals.expected_role || '',
+          work_experience: vals.work_experience || '',
+          skill_tags: String(vals.skill_tags || '').split(',').map((s) => s.trim()).filter(Boolean),
+          contact: vals.contact || '',
+          resume_url: vals.resume_url || '',
+          bio: vals.bio || '',
+          expected_salary: vals.expected_salary || '',
+          expected_city: vals.expected_city || '',
+          slug,
+          status: 'looking',
+        });
+        reloadCatalog();
       }
       toast.show('提交成功 · 我们会尽快审核');
       onClose();

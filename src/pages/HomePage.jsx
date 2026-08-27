@@ -1,11 +1,13 @@
-// 首页 = Hero(深色含 stats) + ask 对话区 + paths 身份分流 + 浅色 For You reco + 深色 Track Record
-// 严格对齐 claude.html 区块顺序与节奏
+// 首页 = Hero(深色含 stats) + ask 对话区 + paths 身份分流 + 最新动态 + For You reco + 深色 Track Record
+// 严格对齐 claude.html 区块顺序与节奏；数据源走 catalog（PB 优先）
 import React, { useState } from 'react';
 import { useRoute } from '../utils/router';
+import { useStore } from '../state/store';
 import { Hero } from '../components/Hero';
 import { AIConsole } from '../components/AIConsole';
 import { Paths } from '../components/Paths';
 import { Reco } from '../components/Reco';
+import { LatestFeed } from '../components/LatestFeed';
 import { Marquee } from '../components/Marquee';
 
 const PARTNERS = [
@@ -22,6 +24,10 @@ PARTNERS.forEach(([, c, list]) => list.forEach((t) => PARTNER_CELLS.push({ t, c 
 export function HomePage() {
   const [askFn, setAskFn] = useState(null);
   const { go } = useRoute();
+  const { catalog } = useStore();
+  const courses    = catalog?.courses    ?? [];
+  const events     = catalog?.events     ?? [];
+  const hackathons = catalog?.hackathons ?? [];
 
   return (
     <>
@@ -29,6 +35,9 @@ export function HomePage() {
 
       <AIConsole onAskReady={setAskFn} />
       <Paths onAsk={(q) => askFn && askFn(q)} />
+
+      {/* 最新动态（spec §7.2：活动+黑客松一条时间线）*/}
+      <LatestFeed courses={courses} events={events} hackathons={hackathons} onOpen={(kind, id) => go(`${kind}/${id}`)} />
 
       {/* For You */}
       <div className="sec">
@@ -39,7 +48,7 @@ export function HomePage() {
               <h2 className="t2">为你推荐</h2>
             </div>
           </div>
-          <Reco onOpen={(kind, id) => go(`${kind}/${id}`)} />
+          <Reco onOpen={(kind, id) => go(`${kind}/${id}`)} courses={courses} events={events} hackathons={hackathons} />
         </div>
       </div>
 

@@ -582,6 +582,10 @@ export function createPbClient(config) {
         }
         return adminProxyCall(name, 'DELETE', id, {});
     }
+    // §15 新表（job_postings / talent_profiles）走 admin 代理，createRule 是 null / 登录用户
+    async function adminCreateRecord(name, payload) { return _adminCreate(name, payload); }
+    async function adminUpdateRecord(name, id, payload) { return _adminUpdate(name, id, payload); }
+    async function adminDeleteRecord(name, id) { return _adminDelete(name, id); }
     // Convenience（与现有 src/utils/pb-client.js 命名一致）
     const createCourse     = (p) => _adminCreate('courses', p);
     const updateCourse     = (id, p) => _adminUpdate('courses', id, p);
@@ -663,6 +667,8 @@ export function createPbClient(config) {
         createSignup, reviewSignup, createLead,
         // generic CRUD
         createRecord, updateRecord, deleteRecord,
+        // §15 admin 代理 CRUD
+        adminCreateRecord, adminUpdateRecord, adminDeleteRecord,
         // convenience: 前端 AdminPage 兼容命名
         createCourse, updateCourse, deleteCourse,
         createEvent, updateEvent, deleteEvent,

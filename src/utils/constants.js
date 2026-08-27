@@ -97,6 +97,21 @@ export const FORM_DEF = {
     fields: JOB_APPLY_FIELDS.map(([k, label]) => [k, label]),
     source:'job',
   },
+  'job-posting': {
+    title:'投递简历',
+    fields: JOB_APPLY_FIELDS.map(([k, label]) => [k, label]),
+    source:'job-posting',
+  },
+  'talent-post': {
+    title:'发布人才信息',
+    fields: [['nickname','姓名或昵称（允许昵称）'],['expected_role','期望职位方向'],['work_experience','工作经历'],['skill_tags','技能标签 · 英文逗号分隔'],['contact','联系方式（仅运营可见，企业通过平台联系你）'],['resume_url','简历 / 个人主页链接（可选）'],['bio','自我介绍（可选）'],['expected_salary','期望薪资（可选）'],['expected_city','期望工作城市（可选）']],
+    source:'talent-post',
+  },
+  'talent-contact': {
+    title:'发起联系',
+    fields: [['company','公司 / 机构名称'],['name','联系人'],['contact','你的联系方式'],['need','想聊的方向 / 岗位']],
+    source:'talent-contact',
+  },
   app:       { title:'申请上架工具', fields:[['name','工具名称'],['url','产品链接'],['contact','联系方式'],['intro','一句话介绍']], source:'app' },
   'app-contact':    { title:'咨询代理产品', fields:[['name','姓名'],['contact','联系方式'],['need','需求描述']], source:'app-contact' },
   'enterprise-ai':  { title:'AI 转型咨询',  fields:[['company','公司名称'],['name','联系人'],['contact','联系方式'],['need','目前想解决的问题']], source:'enterprise-ai' },

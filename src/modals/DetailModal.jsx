@@ -175,7 +175,87 @@ function JobDetail({ j, onSignup }) {
   );
 }
 
-export function DetailModal({ kind, id, data, onClose, onSignup, onPay, onToast }) {
+// spec §15.1 企业招聘信息（job_postings 表）· contact 已在 API 层抹除（§15.3）
+function JobPostingDetail({ j, onSignup, onToast }) {
+  const jt = { full_time:'全职', part_time:'兼职', intern:'实习' };
+  const reqs = (typeof j.requirements === 'string' && j.requirements)
+    ? j.requirements.split('\n').map((s) => s.trim()).filter(Boolean)
+    : (Array.isArray(j.requirements) ? j.requirements : []);
+  return (
+    <>
+      <div className="mtop">
+        <span className="c-cat">{j.company_name}</span>
+        {j.remote ? <span className="lo">支持远程</span> : null}
+        <span className="lo">{jt[j.job_type] || j.job_type || '全职'}</span>
+      </div>
+      <h2>{j.title}</h2>
+      <MetaRow items={[j.location || '地点面议', j.salary_range].filter(Boolean)} />
+      <p className="sm">{j.description}</p>
+      {(j.tags || []).length > 0 && (
+        <div className="c-tags" style={{ margin:'12px 0 6px' }}>
+          {j.tags.map((t, i) => <span key={i} className="tag">#{t}</span>)}
+        </div>
+      )}
+      {reqs.length > 0 && (
+        <>
+          <div className="kick" style={{ margin:'30px 0 6px' }}>Requirements</div>
+          <ul className="olist">{reqs.map((r, i) => <li key={i}><b>{`0${i+1}`}</b><span>{r}</span></li>)}</ul>
+        </>
+      )}
+      <div className="spec" style={{ marginTop:16 }}>
+        简历由平台收集后转发企业，联系方式不会直接展示在前台（spec §15.1 隐私处理）。
+      </div>
+      <div style={{ marginTop:24 }}>
+        <button className="btn btn-fill btn-lg" style={{ width:'100%' }} onClick={() => onSignup('job-posting', j.id)}>投递简历</button>
+      </div>
+    </>
+  );
+}
+
+// spec §15.2 / §15.3 人才信息：前台仅展示用户公开填写的字段，
+// contact 永不展示 —— 企业通过平台发起联系，系统代为触达
+function TalentDetail({ t, onContact, onToast }) {
+  return (
+    <>
+      <div className="mtop">
+        <span className="c-cat">{t.expected_role || '求职者'}</span>
+        <span className="lo">求职中</span>
+      </div>
+      <h2>{t.nickname}</h2>
+      <MetaRow items={[t.expected_city || '城市不限', t.expected_salary].filter(Boolean)} />
+      {t.work_experience && (
+        <>
+          <div className="kick" style={{ margin:'30px 0 6px' }}>工作经历</div>
+          <p className="sm">{t.work_experience}</p>
+        </>
+      )}
+      {(t.skill_tags || []).length > 0 && (
+        <div className="c-tags" style={{ margin:'12px 0 6px' }}>
+          {t.skill_tags.map((tag, i) => <span key={i} className="tag">#{tag}</span>)}
+        </div>
+      )}
+      {t.bio && (
+        <>
+          <div className="kick" style={{ margin:'30px 0 6px' }}>自我介绍</div>
+          <p className="sm">{t.bio}</p>
+        </>
+      )}
+      {t.resume_url && (
+        <div style={{ marginTop:14 }}>
+          <a className="lnk" href={t.resume_url} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()}>简历 / 个人主页 ↗</a>
+        </div>
+      )}
+      <div className="spec" style={{ marginTop:16 }}>
+        联系方式不对外公开。企业发起联系后，由平台代为转达，避免隐私被直接抓取（spec §15.3）。
+      </div>
+      <div style={{ marginTop:24 }}>
+        <button className="btn btn-fill btn-lg" style={{ width:'100%' }} onClick={() => onContact(t.id)}>发起联系</button>
+      </div>
+    </>
+  );
+}
+
+export function DetailModal({ kind, id, data, onClose, onSignup, onPay, onToast, onContact }) {
   if (!kind || !id) return null;
   let body = null;
   if (kind === 'courses') {
@@ -191,9 +271,28 @@ export function DetailModal({ kind, id, data, onClose, onSignup, onPay, onToast 
     if (!h) return null;
     body = <HackDetail h={h} onSignup={onSignup} onToast={onToast} />;
   } else if (kind === 'jobs') {
-    const j = data.jobs.find((x) => x.id === id);
+    // §15 招聘详情三查：job_postings（新表）→ talent_profiles（新表）→ 旧 jobs（兼容）
+    const jp = data.jobPostings ? data.jobPostings.find((x) => x.id === id) : null;
+    if (jp) {
+      body = <JobPostingDetail j={jp} onSignup={onSignup} onToast={onToast} />;
+    } else {
+      const t = data.talents ? data.talents.find((x) => x.id === id) : null;
+      if (t) {
+        body = <TalentDetail t={t} onContact={onContact} onToast={onToast} />;
+      } else {
+        const j = data.jobs.find((x) => x.id === id);
+        if (!j) return null;
+        body = <JobDetail j={j} onSignup={onSignup} />;
+      }
+    }
+  } else if (kind === 'job-posting') {
+    const j = data.jobPostings.find((x) => x.id === id);
     if (!j) return null;
-    body = <JobDetail j={j} onSignup={onSignup} />;
+    body = <JobPostingDetail j={j} onSignup={onSignup} onToast={onToast} />;
+  } else if (kind === 'talent') {
+    const t = data.talents.find((x) => x.id === id);
+    if (!t) return null;
+    body = <TalentDetail t={t} onContact={onContact} onToast={onToast} />;
   } else {
     return null;
   }

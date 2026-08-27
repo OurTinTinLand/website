@@ -85,6 +85,8 @@ export const {
     createSignup, reviewSignup, reviewSubmission, createLead,
     // generic CRUD
     createRecord, updateRecord, deleteRecord,
+    // §15 admin 代理 CRUD
+    adminCreateRecord, adminUpdateRecord, adminDeleteRecord,
     // convenience
     createCourse, updateCourse, deleteCourse,
     createEvent, updateEvent, deleteEvent,

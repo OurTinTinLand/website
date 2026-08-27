@@ -42,6 +42,41 @@ export const jobs = [
 // 招聘列表角色枚举（spec §7.4 已删 AI）
 export const JOB_ROLES = ['工程','运营','BD','设计'];
 
+// §15.1 企业招聘信息（job_postings 表 · contact 仅运营可见，前台永不返回）
+export const jobPostings = [
+  {id:'jp1',company_name:'TinTinLand',title:'AI 解决方案工程师（FDE）',location:'上海',remote:true,
+   job_type:'full_time',
+   description:'负责企业客户 AI 转型方案的落地交付，需要有真实项目交付经验，能独立面对客户。',
+   requirements:['3 年以上工程或咨询经验','熟悉主流大模型 API 与 RAG 工程实践','能独立完成客户沟通与方案演示','有企业内训或咨询经验优先'],
+   salary_range:'25K-45K · 14 薪',
+   tags:['AI','FDE','交付'],
+   review_status:'approved', published:true, content_source:'native'},
+
+  {id:'jp2',company_name:'生态伙伴',title:'生态合作 BD',location:'新加坡',remote:false,
+   job_type:'full_time',
+   description:'对接公链与项目方，推动生态活动与黑客松合作落地。',
+   requirements:['2 年以上 Web3 或 AI 行业 BD 经验','英文可作为工作语言','有公链或投资机构资源优先'],
+   salary_range:'面议',
+   tags:['BD','生态','出海'],
+   review_status:'approved', published:true, content_source:'native'},
+
+  {id:'jp3',company_name:'TinTinLand',title:'社区运营经理',location:'远程',remote:true,
+   job_type:'full_time',
+   description:'负责社区内容运营与活动组织，把 30 万开发者的存量盘活。',
+   requirements:['有技术社区运营经验','中英双语','熟悉 Discord / Telegram / 微信生态'],
+   salary_range:'18K-30K · 14 薪',
+   tags:['运营','社区','双语'],
+   review_status:'approved', published:true, content_source:'native'},
+
+  {id:'jp4',company_name:'TinTinLand',title:'品牌设计师（含吉祥物延展）',location:'上海',remote:true,
+   job_type:'full_time',
+   description:'负责官网、活动物料与 TinTin 吉祥物的视觉延展。',
+   requirements:['熟悉 Figma 与设计系统搭建','有 IP 形象延展经验优先','能与开发协同交付 Design Token'],
+   salary_range:'20K-35K · 14 薪',
+   tags:['设计','品牌','吉祥物'],
+   review_status:'approved', published:true, content_source:'native'},
+];
+
 // §15.2 人才信息 mock（社区用户发布的求职信息）
 // contact 字段前台永不返回（§15.3）
 export const talentProfiles = [
@@ -65,7 +100,7 @@ export const talentProfiles = [
    bio:'想把开发者社区盘活，希望找 Web3 或 AI 方向。',
    expected_salary:'15K-25K',expected_city:'上海',
    resume_url:'',
-   status:'open_to_chat'},
+   status:'looking'},
 ];
 
 // 招聘投递字段（spec §15.1）

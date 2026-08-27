@@ -18,6 +18,9 @@ function parseHash() {
   const seg = h.split('/').filter(Boolean);
   if (!seg.length) return { page: 'home', detailId: null };
   const base = '/' + seg[0];
+  // 多段整路径（如 /auth/login）优先整段匹配
+  const full = '/' + seg.join('/');
+  if (KNOWN_TOP.has(full)) return { page: PATH_ROUTE[full] || 'home', detailId: null };
   if (!KNOWN_TOP.has(base)) return { page: 'notFound', detailId: null };
   const page = PATH_ROUTE[base] || 'home';
   return { page, detailId: seg[1] || null };

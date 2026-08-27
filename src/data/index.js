@@ -71,6 +71,7 @@ export {
 
 export {
   JOB_ROLES,
+  jobPostings,
   talentProfiles,
   JOB_APPLY_FIELDS,
 } from './jobs.js';

@@ -131,6 +131,7 @@ function ContentCenter() {
   const [list, setList] = useState(() => initialList('courses', catalog));
   const [editing, setEditing] = useState(null);
   const [pendingDeleteId, setPendingDeleteId] = useState(null);
+  const fileRef = React.useRef(null);
 
   // 每次 catalog 重新加载（来自 PB）后，同步回填当前 kind 的本地列表
   useEffect(() => {
@@ -213,6 +214,37 @@ function ContentCenter() {
     }
   };
 
+  // §14.2 批量导入：CSV（首行表头）→ 逐条走正常新建链路（复用 toPbPayload）
+  const handleCsvImport = (ev) => {
+    const file = ev.target.files && ev.target.files[0];
+    ev.target.value = '';
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async () => {
+      const rows = parseCsv(String(reader.result || ''));
+      if (rows.length < 2) { toast.show('CSV 至少需要表头 + 一行数据'); return; }
+      const headers = rows[0].map((h) => h.trim());
+      let ok = 0, failed = 0;
+      for (let i = 1; i < rows.length; i++) {
+        const row = rows[i];
+        if (!row || row.every((c) => !String(c).trim())) continue;
+        const draft = { id: '', __new: true, kind };
+        headers.forEach((h, j) => { if (h && row[j] !== undefined && String(row[j]).trim() !== '') draft[h] = String(row[j]).trim(); });
+        try {
+          const payload = toPbPayload(kind, draft);
+          await adminApiFor(kind).create(payload);
+          ok++;
+        } catch (err) {
+          failed++;
+          console.warn('[admin.csv] row', i + 1, 'failed:', err.message);
+        }
+      }
+      toast.show(`批量导入完成 · 成功 ${ok} 条${failed ? `，失败 ${failed} 条（详见控制台）` : ''}`);
+      reloadCatalog();
+    };
+    reader.readAsText(file, 'utf-8');
+  };
+
   return (
     <>
       <div className="spec" style={{ marginBottom:18 }}>
@@ -225,14 +257,25 @@ function ContentCenter() {
       </div>
 
       <div className="pills" style={{ marginBottom:18 }}>
-        {[['courses','课程'],['events','活动'],['hackathons','黑客松'],['jobs','招聘'],['apps','应用工具'],['providers','Token Hub 渠道']].map(([k, l]) => (
+        {[['courses','课程'],['events','活动'],['hackathons','黑客松'],['job_postings','企业岗位'],['talent_profiles','人才信息'],['apps','应用工具'],['providers','Token Hub 渠道']].map(([k, l]) => (
           <button key={k} className={kind === k ? 'on' : ''} onClick={() => switchKind(k)}>{l}</button>
         ))}
       </div>
 
-      <button className="btn btn-fill btn-sm" style={{ marginBottom:14 }} onClick={() => setEditing({ id:'', __new:true, kind, review_required:false, fields_config:{}, tags:[], state:'upcoming', content_source:'native' })}>
-        + 新建{kindLabel(kind)}
-      </button>
+      <div style={{ display:'flex', gap:10, alignItems:'center', marginBottom:14 }}>
+        <button className="btn btn-fill btn-sm" onClick={() => setEditing({ id:'', __new:true, kind, review_required:false, fields_config:{}, tags:[], state:'upcoming', content_source:'native' })}>
+          + 新建{kindLabel(kind)}
+        </button>
+        {/* §14.2 批量导入 CSV（建议项）：标题,分类,标签,内容来源,外链,状态… */}
+        <button className="btn btn-line btn-sm" onClick={() => fileRef.current && fileRef.current.click()}>
+          批量导入 CSV
+        </button>
+        <span className="xs" style={{ color:'var(--ink-3)' }}>
+          模板列：title,category,tags,content_source,external_url,state（当前板块专属字段见表单）
+        </span>
+        <input ref={fileRef} type="file" accept=".csv,text/csv" style={{ display:'none' }}
+               onChange={handleCsvImport} />
+      </div>
 
       <ContentList kind={kind} list={list} pendingDeleteId={pendingDeleteId} onEdit={setEditing} onToggleState={persistToggleState} onRemove={persistRemove} />
 
@@ -256,6 +299,9 @@ function adminApiFor(kind) {
     case 'events':     return { create: PB.createEvent,     update: PB.updateEvent,     remove: PB.deleteEvent };
     case 'hackathons': return { create: PB.createHackathon, update: PB.updateHackathon, remove: PB.deleteHackathon };
     case 'jobs':       return { create: PB.createJob,       update: PB.updateJob,       remove: PB.deleteJob };
+    // §15 新表：走 admin 代理（createRule=null / 登录用户，裸 createRecord 会 403）
+    case 'job_postings':    return { create: (b) => PB.adminCreateRecord('job_postings', b),    update: (id, b) => PB.adminUpdateRecord('job_postings', id, b),    remove: (id) => PB.adminDeleteRecord('job_postings', id) };
+    case 'talent_profiles': return { create: (b) => PB.adminCreateRecord('talent_profiles', b), update: (id, b) => PB.adminUpdateRecord('talent_profiles', id, b), remove: (id) => PB.adminDeleteRecord('talent_profiles', id) };
     case 'apps':       return { create: PB.createApp,       update: PB.updateApp,       remove: PB.deleteApp };
     case 'providers':  return { create: PB.createProvider,  update: PB.updateProvider,  remove: PB.deleteProvider };
     default:           return { create: async () => { throw new Error('unsupported kind: ' + kind); },
@@ -326,6 +372,37 @@ function toPbPayload(kind, draft) {
       company: draft.company || '',
     };
   }
+  if (kind === 'job_postings') {
+    // §15.1 企业招聘信息：contact 仅后台可见；review_status 由审核中心流转
+    const p = {};
+    out(p, 'title', draft.title); out(p, 'slug', draft.slug || slugFallback);
+    out(p, 'company_name', draft.company_name || draft.company || '');
+    out(p, 'location', draft.location); out(p, 'remote', !!draft.remote);
+    out(p, 'job_type', draft.job_type || 'full_time');
+    out(p, 'description', draft.description); out(p, 'requirements', draft.requirements);
+    out(p, 'salary_range', draft.salary_range); out(p, 'contact', draft.contact);
+    p.tags = Array.isArray(draft.tags) ? draft.tags : [];
+    p.review_status = draft.review_status || 'pending_review';
+    p.published = draft.published === false ? false : true;
+    p.state = draft.state || 'upcoming';
+    return p;
+  }
+  if (kind === 'talent_profiles') {
+    // §15.2 社区人才信息：contact 仅后台可见
+    const t = {};
+    out(t, 'slug', draft.slug || slugFallback);
+    out(t, 'nickname', draft.nickname || draft.title || '');
+    out(t, 'expected_role', draft.expected_role || draft.category || '');
+    out(t, 'work_experience', draft.work_experience);
+    t.skill_tags = Array.isArray(draft.skill_tags) ? draft.skill_tags : (Array.isArray(draft.tags) ? draft.tags : []);
+    out(t, 'contact', draft.contact); out(t, 'resume_url', draft.resume_url);
+    out(t, 'bio', draft.bio); out(t, 'expected_salary', draft.expected_salary);
+    out(t, 'expected_city', draft.expected_city);
+    t.status = draft.status || 'looking';
+    t.review_status = draft.review_status || 'pending_review';
+    t.published = draft.published === false ? false : true;
+    return t;
+  }
   if (kind === 'apps') {
     // apps schema 用 slug，name 字段没有 unique 约束
     return {
@@ -348,7 +425,7 @@ function looksLikePbId(id) {
 }
 
 function kindLabel(k) {
-  return ({ courses:'课程', events:'活动', hackathons:'黑客松', jobs:'招聘', apps:'应用工具', providers:'Token Hub 渠道' })[k] || k;
+  return ({ courses:'课程', events:'活动', hackathons:'黑客松', jobs:'招聘', job_postings:'企业岗位', talent_profiles:'人才信息', apps:'应用工具', providers:'Token Hub 渠道' })[k] || k;
 }
 
 function initialList(kind, cat) {
@@ -358,6 +435,8 @@ function initialList(kind, cat) {
     : kind === 'events'     ? cat.events
     : kind === 'hackathons' ? cat.hackathons
     : kind === 'jobs'       ? cat.jobs
+    : kind === 'job_postings'    ? cat.jobPostings
+    : kind === 'talent_profiles' ? cat.talents
     : kind === 'apps'       ? cat.apps
     : kind === 'providers'  ? cat.providers
     : [];
@@ -370,14 +449,24 @@ function initialList(kind, cat) {
 
 function slim(x) {
   return {
-    id: x.id, title: x.title || x.name || '',
-    category: x.category || x.tag || x.role || x.theme || '',
+    id: x.id, title: x.title || x.name || x.nickname || '',
+    category: x.category || x.tag || x.role || x.theme || x.company_name || x.expected_role || '',
     subcategory: x.subcategory || '',
-    tags: x.tags || [],
+    tags: x.tags || x.skill_tags || [],
     state: x.state || 'upcoming',
     review_required: !!x.signup_review_required,
     fields_config: x.signup_fields_config || {},
     content_source: x.content_source || 'native',
+    // §15 新表透传字段（ContentEditModal 编辑用）
+    company_name: x.company_name || '', location: x.location || '', remote: !!x.remote,
+    job_type: x.job_type || 'full_time', description: x.description || '',
+    requirements: x.requirements || '', salary_range: x.salary_range || '',
+    contact: x.contact || '', nickname: x.nickname || '', expected_role: x.expected_role || '',
+    work_experience: x.work_experience || '', skill_tags: x.skill_tags || [],
+    resume_url: x.resume_url || '', bio: x.bio || '',
+    expected_salary: x.expected_salary || '', expected_city: x.expected_city || '',
+    status: x.status || 'looking', review_status: x.review_status || 'pending_review',
+    published: x.published === false ? false : true,
   };
 }
 
@@ -475,6 +564,41 @@ function ContentEditModal({ def, kind, onClose, onSave }) {
           <div className="fr"><label>自定义标签 · 英文逗号分隔</label>
             <input value={(draft.tags || []).join(',')} onChange={(e) => set('tags', e.target.value.split(',').map((s) => s.trim()).filter(Boolean))} placeholder="Solidity,EVM,审计" />
           </div>
+
+          {kind === 'job_postings' && (
+            <>
+              <div className="fr"><label>公司名称</label><input value={draft.company_name || ''} onChange={(e) => set('company_name', e.target.value)} /></div>
+              <div className="fr"><label>工作地点</label><input value={draft.location || ''} onChange={(e) => set('location', e.target.value)} placeholder="上海 / 新加坡 / 远程" /></div>
+              <div className="fr"><label>是否远程</label>
+                <label className="ck"><input type="checkbox" checked={!!draft.remote} onChange={(e) => set('remote', e.target.checked)} />支持远程</label>
+              </div>
+              <div className="fr"><label>职位类型</label>
+                <select value={draft.job_type || 'full_time'} onChange={(e) => set('job_type', e.target.value)}>
+                  <option value="full_time">全职</option><option value="part_time">兼职</option><option value="intern">实习</option>
+                </select>
+              </div>
+              <div className="fr"><label>薪资范围</label><input value={draft.salary_range || ''} onChange={(e) => set('salary_range', e.target.value)} placeholder="25K-45K · 14 薪 / 面议" /></div>
+              <div className="fr"><label>职位描述</label><textarea value={draft.description || ''} onChange={(e) => set('description', e.target.value)} /></div>
+              <div className="fr"><label>任职要求 · 每行一条</label><textarea value={draft.requirements || ''} onChange={(e) => set('requirements', e.target.value)} placeholder={'3 年以上工程或咨询经验\n熟悉主流大模型 API'} /></div>
+              <div className="fr"><label>联系方式（仅后台可见）</label><input value={draft.contact || ''} onChange={(e) => set('contact', e.target.value)} placeholder="hr@tintin.land" /></div>
+            </>
+          )}
+
+          {kind === 'talent_profiles' && (
+            <>
+              <div className="fr"><label>昵称</label><input value={draft.nickname || ''} onChange={(e) => set('nickname', e.target.value)} /></div>
+              <div className="fr"><label>期望职位方向</label><input value={draft.expected_role || ''} onChange={(e) => set('expected_role', e.target.value)} /></div>
+              <div className="fr"><label>工作经历</label><textarea value={draft.work_experience || ''} onChange={(e) => set('work_experience', e.target.value)} /></div>
+              <div className="fr"><label>技能标签 · 英文逗号分隔</label>
+                <input value={(draft.skill_tags || []).join(',')} onChange={(e) => set('skill_tags', e.target.value.split(',').map((s) => s.trim()).filter(Boolean))} placeholder="React,Solidity" />
+              </div>
+              <div className="fr"><label>联系方式（仅后台可见）</label><input value={draft.contact || ''} onChange={(e) => set('contact', e.target.value)} /></div>
+              <div className="fr"><label>简历 / 主页链接</label><input value={draft.resume_url || ''} onChange={(e) => set('resume_url', e.target.value)} placeholder="https://" /></div>
+              <div className="fr"><label>自我介绍</label><textarea value={draft.bio || ''} onChange={(e) => set('bio', e.target.value)} /></div>
+              <div className="fr"><label>期望薪资</label><input value={draft.expected_salary || ''} onChange={(e) => set('expected_salary', e.target.value)} /></div>
+              <div className="fr"><label>期望城市</label><input value={draft.expected_city || ''} onChange={(e) => set('expected_city', e.target.value)} /></div>
+            </>
+          )}
 
           <div className="fr"><label>内容来源</label>
             <select value={draft.content_source || 'native'} onChange={(e) => set('content_source', e.target.value)}>
@@ -724,4 +848,34 @@ function NotifyConfig() {
       </div>
     </>
   );
+}
+
+// §14.2 批量导入：极简 CSV 解析（支持双引号包裹与转义引号）
+function parseCsv(text) {
+  const rows = [];
+  let row = [], cell = '', inQ = false;
+  const s = String(text);
+  for (let i = 0; i < s.length; i++) {
+    const ch = s[i];
+    if (inQ) {
+      if (ch === '"') {
+        if (s[i + 1] === '"') { cell += '"'; i++; }
+        else inQ = false;
+      } else cell += ch;
+    } else if (ch === '"') {
+      inQ = true;
+    } else if (ch === ',') {
+      row.push(cell); cell = '';
+    } else if (ch === '\n' || ch === '\r') {
+      if (ch === '\r' && s[i + 1] === '\n') i++;
+      row.push(cell); cell = '';
+      if (row.some((c) => String(c).trim() !== '')) rows.push(row);
+      row = [];
+    } else {
+      cell += ch;
+    }
+  }
+  row.push(cell);
+  if (row.some((c) => String(c).trim() !== '')) rows.push(row);
+  return rows;
 }

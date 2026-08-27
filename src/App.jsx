@@ -44,6 +44,8 @@ function Shell() {
   const events     = catalog?.events     ?? seedEvents;
   const hackathons = catalog?.hackathons ?? seedHackathons;
   const jobs       = catalog?.jobs       ?? seedJobs;
+  const jobPostings = catalog?.jobPostings ?? [];
+  const talents    = catalog?.talents    ?? [];
 
   // 统一登录入口：dispatch app:openPrivyNative → PrivyNativeLauncher 直接弹 Privy 原生 modal
   const openLogin  = (after) => {
@@ -56,7 +58,10 @@ function Shell() {
   const closePay   = () => setPayCourseId(null);
 
   const handleSignup = (kind, id) => {
-    const itemsByKind = { course: courses, event: events, hackathon: hackathons, job: jobs };
+    const itemsByKind = {
+      course: courses, event: events, hackathon: hackathons, job: jobs,
+      'job-posting': jobPostings,
+    };
     const item = itemsByKind[kind] ? itemsByKind[kind].find((x) => x.id === id) : null;
     const itemTitle = item ? item.title : '—';
     if (!session.logged) { openLogin(() => handleSignup(kind, id)); return; }
@@ -75,6 +80,26 @@ function Shell() {
     openForm(kind, id, title);
   };
 
+  // §15.2 发布人才信息：未登录先登录，登录后打开人才表单
+  const handlePublishTalent = () => {
+    if (!session.logged) {
+      openLogin(handlePublishTalent);
+      return;
+    }
+    openForm('talent-post');
+  };
+
+  // §15.3 企业发起联系：表单提交到 signups（kind=talent-contact），由平台代为触达
+  const handleContactTalent = (talentId) => {
+    const t = talents.find((x) => x.id === talentId);
+    const title = t ? `联系 ${t.nickname}` : '联系人才';
+    if (!session.logged) {
+      openLogin(() => handleContactTalent(talentId));
+      return;
+    }
+    openForm('talent-contact', talentId, title);
+  };
+
   const renderPage = () => {
     if (page === 'home') return <HomePage />;
     if (['courses','events','hackathons','jobs','apps'].includes(page)) {
@@ -84,6 +109,7 @@ function Shell() {
           onOpen={(id) => go(`${page}/${id}`)}
           onApply={(kind, id, title) => handleApply(kind, id, title)}
           onConsult={(kind) => handleApply(kind)}
+          onPublishTalent={handlePublishTalent}
         />
       );
     }
@@ -109,11 +135,12 @@ function Shell() {
         <DetailModal
           kind={page}
           id={detailId}
-          data={{ courses, events, hackathons, jobs }}
+          data={{ courses, events, hackathons, jobs, jobPostings, talents }}
           onClose={() => go(page)}
           onSignup={handleSignup}
           onPay={(courseId) => { if (!session.logged) { openLogin(() => openPay(courseId)); return; } openPay(courseId); }}
           onToast={(msg) => toast.show(msg)}
+          onContact={handleContactTalent}
         />
       )}
 

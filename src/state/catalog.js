@@ -8,11 +8,13 @@ import {
   hackathons as seedHackathons, jobs as seedJobs,
   apps as seedApps,
 } from '../data/index.js';
+import { jobPostings as seedJobPostings, talentProfiles as seedTalents } from '../data/jobs.js';
 import { providers as seedProviders } from '../data/providers.js';
 
 const SEED = {
   courses: seedCourses, events: seedEvents,
   hackathons: seedHackathons, jobs: seedJobs,
+  jobPostings: seedJobPostings, talents: seedTalents,
   apps: seedApps, providers: seedProviders,
 };
 
@@ -26,13 +28,15 @@ export async function loadAllCatalog() {
   _loadingPromise = (async () => {
     const result = { ...SEED, _source: 'fallback', _loadedAt: Date.now() };
     try {
-      const [c, e, h, j, a, p] = await Promise.all([
+      const [c, e, h, j, a, p, jp, tl] = await Promise.all([
         PB.listCoursesNormalized({ perPage: 100 }),
         PB.listEventsNormalized({ perPage: 100 }),
         PB.listHackathonsNormalized({ perPage: 100 }),
         PB.listJobsNormalized({ perPage: 100 }),
         PB.listAppsNormalized({ perPage: 100 }),
         PB.listProvidersNormalized({ perPage: 100 }),
+        PB.listJobPostingsNormalized({ perPage: 100 }),
+        PB.listTalentProfilesNormalized({ perPage: 100 }),
       ]);
       result.courses = c.length ? c : seedCourses;
       result.events = e.length ? e : seedEvents;
@@ -40,6 +44,8 @@ export async function loadAllCatalog() {
       result.jobs = j.length ? j : seedJobs;
       result.apps = a.length ? a : seedApps;
       result.providers = p.length ? p : seedProviders;
+      result.jobPostings = jp.length ? jp : seedJobPostings;
+      result.talents = tl.length ? tl : seedTalents;
       result._source = 'api';
     } catch (err) {
       console.warn('[catalog] PB unreachable, using seed:', err.message);

@@ -65,7 +65,7 @@ export function MemberPage({ openLogin }) {
         </div>
 
         {tab === 'trail'   && <TrailTab signups={mySignup} />}
-        {tab === 'orders'  && <OrdersTab mine={mine} />}
+        {tab === 'orders'  && <OrdersTab mine={mine} toast={toast} />}
         {tab === 'profile' && (
           <ProfileTab profile={session.profile} method={session.method} email={session.email}
                       saveProfile={saveProfile} logout={logout} toast={toast}
@@ -115,7 +115,7 @@ function TrailTab({ signups }) {
 }
 
 // spec §16.1 交易记录：订单号、金额、状态、支付方式、对应课程/活动名称 · 支持导出
-function OrdersTab({ mine }) {
+function OrdersTab({ mine, toast }) {
   const exportCsv = () => {
     if (!mine.length) return;
     const headers = ['订单号','项目','金额','支付方式','状态','顾问码','创建时间'];

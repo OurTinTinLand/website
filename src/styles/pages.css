@@ -102,5 +102,6 @@
 .feed-kind{font-size:11px;font-weight:700;border:1.4px solid var(--ink);border-radius:var(--r-pill);padding:2px 8px;text-align:center;}
 .feed-title{font-weight:600;font-size:14.5px;}
 @media(max-width:760px){.feed-row{grid-template-columns:1fr;gap:6px;}}
+.feed-pinned{background:var(--lilac-50);box-shadow:inset 3px 0 0 var(--accent, #5F23F0);}
 
 /* ============ table.t 注入（在 layout.css 中已声明；这里延伸为基本数据态） ============ */

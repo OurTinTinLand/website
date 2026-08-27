@@ -644,26 +644,161 @@ function ContentEditModal({ def, kind, onClose, onSave }) {
 }
 
 // ========== ② 首页运营位 §14.3 ==========
+// 三块可编辑运营配置，落库 home_ops 表（key + data json），前台实时读取：
+//   logo_wall（增删、排序）/ hero 文案 / feed_pin 最新动态置顶
 function HomeOps() {
+  const { catalog, reloadCatalog } = useStore();
+  const toast = useToast();
+  const ho = catalog?.homeOps || {};
+
+  const [wall, setWall] = useState(() => (ho.logoWall || []).map((g) => [g[0], g[1], (g[2] || []).join(',')]));
+  const [hero, setHero] = useState(() => ({ badge: '', h1: '', lead: '' }));
+  const [pin, setPin] = useState(() => []);
+  const [pickKind, setPickKind] = useState('event');
+  const [pickId, setPickId] = useState('');
+
+  // catalog 异步到达后同步本地草稿（仅当本地还是初始空值时）
+  useEffect(() => {
+    if (ho.logoWall && !wall.length) setWall(ho.logoWall.map((g) => [g[0], g[1], (g[2] || []).join(',')]));
+    if (ho.hero && !hero.badge) setHero({ badge: ho.hero.badge || '', h1: ho.hero.h1 || '', lead: ho.hero.lead || '' });
+    if (ho.feedPin && !pin.length) setPin([...(ho.feedPin || [])]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ho.logoWall, ho.hero, ho.feedPin]);
+
+  const saveHomeOp = async (key, data) => {
+    try {
+      const raw = catalog?.homeOps?.raw || [];
+      const rec = raw.find((r) => r.key === key);
+      if (rec) await PB.adminUpdateRecord('home_ops', rec.id, { data });
+      else await PB.adminCreateRecord('home_ops', { key, data });
+      toast.show(`已保存 · ${key}`);
+      reloadCatalog();
+    } catch (err) {
+      toast.show('保存失败：' + (err.message || 'unknown'));
+    }
+  };
+
+  // —— Logo 墙 ——
+  const setGroup = (i, k, v) => setWall((p) => p.map((g, j) => j === i ? { ...g, [k]: v } : g));
+  const moveGroup = (i, dir) => setWall((p) => {
+    const j = i + dir;
+    if (j < 0 || j >= p.length) return p;
+    const q = [...p];
+    [q[i], q[j]] = [q[j], q[i]];
+    return q;
+  });
+  const saveWall = () => saveHomeOp('logo_wall', wall.map((g) => [String(g[0]).trim(), g[1] || '#5F23F0', String(g[2]).split(',').map((s) => s.trim()).filter(Boolean)]));
+
+  // —— 置顶 ——
+  const pickPool = {
+    event:     (catalog?.events || []).filter((x) => x.content_source === 'native'),
+    hackathon: (catalog?.hackathons || []).filter((x) => x.content_source === 'native'),
+    course:    (catalog?.courses || []).filter((x) => x.content_source === 'native'),
+  }[pickKind] || [];
+  const addPin = () => {
+    if (!pickId) { toast.show('请先选择要置顶的内容'); return; }
+    const item = pickPool.find((x) => x.id === pickId);
+    setPin((p) => [...p, { kind: pickKind, id: pickId }].filter((x, i, a) => a.findIndex((y) => y.kind === x.kind && y.id === x.id) === i));
+    setPickId('');
+    if (item) toast.show(`已加入置顶列表 · ${item.title.slice(0, 24)}`);
+  };
+  const movePin = (i, dir) => setPin((p) => {
+    const j = i + dir;
+    if (j < 0 || j >= p.length) return p;
+    const q = [...p];
+    [q[i], q[j]] = [q[j], q[i]];
+    return q;
+  });
+  const pinLabel = (p) => {
+    const pool = { event: catalog?.events, hackathon: catalog?.hackathons, course: catalog?.courses }[p.kind] || [];
+    const it = pool.find((x) => x.id === p.id);
+    return it ? `${p.kind} · ${it.title}` : `${p.kind} · ${p.id}`;
+  };
+
   return (
     <>
-      <div className="spec">合作项目 Logo 墙 · 首页 Hero 内容 · 最新动态手动置顶</div>
+      <div className="spec" style={{ marginBottom:18 }}>
+        合作项目 Logo 墙 · 首页 Hero 内容 · 最新动态手动置顶 —— 保存后前台实时生效（spec §14.3）。
+      </div>
       <div className="grid g2">
+
+        {/* Logo 墙 */}
         <div className="card-ops">
           <h4>合作项目 Logo 墙</h4>
-          <p>支持增删、拖拽排序</p>
-          <button className="btn btn-line btn-sm">管理 Logo</button>
+          <p className="xs">分组名 + 颜色 + 名称（英文逗号分隔）。支持增删与上下排序。</p>
+          {wall.map((g, i) => (
+            <div key={i} className="fcard" style={{ marginBottom:10 }}>
+              <div className="fr"><label>分组 {i + 1}</label>
+                <input value={g[0]} onChange={(e) => setGroup(i, 0, e.target.value)} />
+              </div>
+              <div className="fr"><label>颜色</label>
+                <input value={g[1]} onChange={(e) => setGroup(i, 1, e.target.value)} style={{ width:120 }} placeholder="#5F23F0" />
+              </div>
+              <div className="fr"><label>名称</label>
+                <textarea rows={2} value={g[2]} onChange={(e) => setGroup(i, 2, e.target.value)} placeholder="Polkadot,Aptos,…" />
+              </div>
+              <div style={{ display:'flex', gap:8 }}>
+                <button className="btn btn-line btn-xs" onClick={() => moveGroup(i, -1)} disabled={i === 0}>↑</button>
+                <button className="btn btn-line btn-xs" onClick={() => moveGroup(i, 1)} disabled={i === wall.length - 1}>↓</button>
+                <button className="btn btn-line btn-xs" onClick={() => setWall((p) => p.filter((_, j) => j !== i))}>删除组</button>
+              </div>
+            </div>
+          ))}
+          <div style={{ display:'flex', gap:10, marginTop:6 }}>
+            <button className="btn btn-line btn-sm" onClick={() => setWall((p) => [...p, ['新分组', '#5F23F0', '']])}>+ 新增分组</button>
+            <button className="btn btn-fill btn-sm" onClick={saveWall}>保存 Logo 墙</button>
+          </div>
         </div>
+
+        {/* Hero 内容 */}
         <div className="card-ops">
           <h4>首页 Hero 内容</h4>
-          <p>替换焦点图 / 标题 / 副标题 / 快捷 chip</p>
-          <button className="btn btn-line btn-sm">编辑 Hero</button>
+          <p className="xs">badge 徽标 / 主标题（\n 换行，第二行强调）/ 副标题段落。</p>
+          <div className="fcard">
+            <div className="fr"><label>徽标 badge</label>
+              <input value={hero.badge} onChange={(e) => setHero((p) => ({ ...p, badge: e.target.value }))} />
+            </div>
+            <div className="fr"><label>主标题 h1 · 两行用 \n 分隔</label>
+              <textarea rows={2} value={hero.h1} onChange={(e) => setHero((p) => ({ ...p, h1: e.target.value }))} placeholder={'华语开发者的主场\n现在向 AI 敞开。'} />
+            </div>
+            <div className="fr"><label>副标题 lead</label>
+              <textarea rows={3} value={hero.lead} onChange={(e) => setHero((p) => ({ ...p, lead: e.target.value }))} />
+            </div>
+            <button className="btn btn-fill btn-sm" onClick={() => saveHomeOp('hero', { badge: hero.badge, h1: hero.h1, lead: hero.lead })}>保存 Hero</button>
+          </div>
         </div>
+
+        {/* 最新动态置顶 */}
         <div className="card-ops">
           <h4>最新动态手动置顶</h4>
-          <p>不完全依赖时间自动排序</p>
-          <button className="btn btn-line btn-sm">选择置顶内容</button>
+          <p className="xs">选择站内活动 / 黑客松 / 课程置顶到时间线最前（按列表顺序，最多 8 条展示）。</p>
+          <div style={{ display:'flex', gap:8, marginBottom:10 }}>
+            <select value={pickKind} onChange={(e) => { setPickKind(e.target.value); setPickId(''); }} style={{ flex:1 }}>
+              <option value="event">活动</option>
+              <option value="hackathon">黑客松</option>
+              <option value="course">课程</option>
+            </select>
+            <select value={pickId} onChange={(e) => setPickId(e.target.value)} style={{ flex:2 }}>
+              <option value="">选择内容…</option>
+              {pickPool.map((x) => <option key={x.id} value={x.id}>{x.title.slice(0, 36)}</option>)}
+            </select>
+            <button className="btn btn-line btn-sm" onClick={addPin}>置顶</button>
+          </div>
+          {pin.length === 0 ? (
+            <div className="empty" style={{ padding:'16px 0' }}>暂无置顶内容</div>
+          ) : (
+            pin.map((p, i) => (
+              <div key={i} style={{ display:'flex', gap:8, alignItems:'center', marginBottom:6 }}>
+                <span className="xs" style={{ flex:1 }}>{i + 1}. {pinLabel(p)}</span>
+                <button className="btn btn-line btn-xs" onClick={() => movePin(i, -1)} disabled={i === 0}>↑</button>
+                <button className="btn btn-line btn-xs" onClick={() => movePin(i, 1)} disabled={i === pin.length - 1}>↓</button>
+                <button className="btn btn-line btn-xs" onClick={() => setPin((q) => q.filter((_, j) => j !== i))}>移除</button>
+              </div>
+            ))
+          )}
+          <button className="btn btn-fill btn-sm" style={{ marginTop:6 }} onClick={() => saveHomeOp('feed_pin', pin)}>保存置顶</button>
         </div>
+
       </div>
     </>
   );
@@ -827,23 +962,52 @@ function UserOps() {
 }
 
 // ========== ⑥ 通知文案 §14.7 ==========
+// ========== ⑥ 系统通知文案 §14.7 ==========
+// 模板存 home_ops.notify_templates，{item_title} / {order_id} / {start_at} 为变量占位
 function NotifyConfig() {
+  const { catalog, reloadCatalog } = useStore();
+  const toast = useToast();
+  const tpl = catalog?.homeOps?.notifyTemplates || {};
+  const [draft, setDraft] = useState({
+    approved: tpl.approved || '你报名的 {item_title} 已通过审核，期待你的参与！',
+    order_verified: tpl.order_verified || '订单 {order_id} 已核实到账，正式为你开通课程/活动权限。',
+    event_reminder: tpl.event_reminder || '{item_title} 将在 {start_at} 开始，记得按时参加。',
+  });
+
+  useEffect(() => {
+    if (tpl.approved) setDraft((p) => ({ ...p, approved: tpl.approved, order_verified: tpl.order_verified || p.order_verified, event_reminder: tpl.event_reminder || p.event_reminder }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tpl.approved]);
+
+  const save = async () => {
+    try {
+      const raw = catalog?.homeOps?.raw || [];
+      const rec = raw.find((r) => r.key === 'notify_templates');
+      if (rec) await PB.adminUpdateRecord('home_ops', rec.id, { data: draft });
+      else await PB.adminCreateRecord('home_ops', { key: 'notify_templates', data: draft });
+      toast.show('通知模板已保存');
+      reloadCatalog();
+    } catch (err) {
+      toast.show('保存失败：' + (err.message || 'unknown'));
+    }
+  };
+
   return (
     <>
       <div className="spec" style={{ marginBottom:18 }}>
-        审核通过、订单核实、活动提醒等系统通知文案，运营可直接修改。
+        审核通过、订单核实、活动提醒等系统通知文案，运营可直接修改（变量占位符，如 {'{item_title}'}）。保存后前台发送通知时生效。
       </div>
       <div className="fcard" style={{ maxWidth:680 }}>
         <div className="fr"><label>审核通过</label>
-          <textarea rows="2" defaultValue="你报名的 {item_title} 已通过审核，期待你的参与！" />
+          <textarea rows="2" value={draft.approved} onChange={(e) => setDraft((p) => ({ ...p, approved: e.target.value }))} />
         </div>
         <div className="fr"><label>订单核实</label>
-          <textarea rows="2" defaultValue="订单 {order_id} 已核实到账，正式为你开通课程/活动权限。" />
+          <textarea rows="2" value={draft.order_verified} onChange={(e) => setDraft((p) => ({ ...p, order_verified: e.target.value }))} />
         </div>
         <div className="fr"><label>活动提醒</label>
-          <textarea rows="2" defaultValue="{item_title} 将在 {start_at} 开始，记得按时参加。" />
+          <textarea rows="2" value={draft.event_reminder} onChange={(e) => setDraft((p) => ({ ...p, event_reminder: e.target.value }))} />
         </div>
-        <button className="btn btn-fill" style={{ marginTop:10 }}>保存模板</button>
+        <button className="btn btn-fill" style={{ marginTop:10 }} onClick={save}>保存模板</button>
         <div className="spec">运营可直接修改文案，无需重新发布。</div>
       </div>
     </>

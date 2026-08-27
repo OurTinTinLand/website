@@ -18,9 +18,6 @@ const PARTNERS = [
   ['安全审计', '#C2751A', ['CertiK','SlowMist','Secure3','ScaleBit','SharkTeam','MoveBit']],
 ];
 
-const PARTNER_CELLS = [];
-PARTNERS.forEach(([, c, list]) => list.forEach((t) => PARTNER_CELLS.push({ t, c })));
-
 export function HomePage() {
   const [askFn, setAskFn] = useState(null);
   const { go } = useRoute();
@@ -28,16 +25,24 @@ export function HomePage() {
   const courses    = catalog?.courses    ?? [];
   const events     = catalog?.events     ?? [];
   const hackathons = catalog?.hackathons ?? [];
+  // §14.3 首页运营位：Logo 墙 / Hero 文案 / 最新动态置顶 均可由后台配置
+  const logoWall  = catalog?.homeOps?.logoWall || PARTNERS;
+  const heroCfg   = catalog?.homeOps?.hero;
+  const feedPin   = catalog?.homeOps?.feedPin || [];
+
+  // Logo 墙数据：默认硬编码 → 后台 logo_wall 覆盖（[组名, 颜色, [名称...]]）
+  const partnerCells = [];
+  logoWall.forEach(([, c, list]) => (list || []).forEach((t) => partnerCells.push({ t, c })));
 
   return (
     <>
-      <Hero />
+      <Hero content={heroCfg} />
 
       <AIConsole onAskReady={setAskFn} />
       <Paths onAsk={(q) => askFn && askFn(q)} />
 
-      {/* 最新动态（spec §7.2：活动+黑客松一条时间线）*/}
-      <LatestFeed courses={courses} events={events} hackathons={hackathons} onOpen={(kind, id) => go(`${kind}/${id}`)} />
+      {/* 最新动态（spec §7.2：活动+黑客松一条时间线，§14.3 支持手动置顶）*/}
+      <LatestFeed courses={courses} events={events} hackathons={hackathons} pin={feedPin} onOpen={(kind, id) => go(`${kind}/${id}`)} />
 
       {/* For You */}
       <div className="sec">
@@ -73,7 +78,7 @@ export function HomePage() {
           <h3 className="t3" style={{ color:'#fff', marginBottom:12 }}>和我们一起干活的人</h3>
           <p className="lead" style={{ marginBottom:34 }}>50+ 条公链、220+ 生态伙伴、1000+ KOL、主流行业媒体与安全审计机构。</p>
         </div>
-        <Marquee items={PARTNER_CELLS} />
+        <Marquee items={partnerCells} />
         <div className="wrap"><p className="xs" style={{ color:'var(--d-txt-2)', marginTop:20 }}>名单为部分展示，正式对外版本需 BD 确认授权后替换为官方 Logo。</p></div>
       </div>
     </>

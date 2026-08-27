@@ -16,6 +16,7 @@ const SEED = {
   hackathons: seedHackathons, jobs: seedJobs,
   jobPostings: seedJobPostings, talents: seedTalents,
   apps: seedApps, providers: seedProviders,
+  homeOps: { logoWall: null, hero: null, notifyTemplates: null, feedPin: [], raw: [] },
 };
 
 let _catalog = null;       // 全局缓存
@@ -28,7 +29,7 @@ export async function loadAllCatalog() {
   _loadingPromise = (async () => {
     const result = { ...SEED, _source: 'fallback', _loadedAt: Date.now() };
     try {
-      const [c, e, h, j, a, p, jp, tl] = await Promise.all([
+      const [c, e, h, j, a, p, jp, tl, ho] = await Promise.all([
         PB.listCoursesNormalized({ perPage: 100 }),
         PB.listEventsNormalized({ perPage: 100 }),
         PB.listHackathonsNormalized({ perPage: 100 }),
@@ -37,6 +38,7 @@ export async function loadAllCatalog() {
         PB.listProvidersNormalized({ perPage: 100 }),
         PB.listJobPostingsNormalized({ perPage: 100 }),
         PB.listTalentProfilesNormalized({ perPage: 100 }),
+        PB.listHomeOpsNormalized({ perPage: 20 }),
       ]);
       result.courses = c.length ? c : seedCourses;
       result.events = e.length ? e : seedEvents;
@@ -46,6 +48,7 @@ export async function loadAllCatalog() {
       result.providers = p.length ? p : seedProviders;
       result.jobPostings = jp.length ? jp : seedJobPostings;
       result.talents = tl.length ? tl : seedTalents;
+      result.homeOps = (ho && ho.raw && ho.raw.length) ? ho : SEED.homeOps;
       result._source = 'api';
     } catch (err) {
       console.warn('[catalog] PB unreachable, using seed:', err.message);

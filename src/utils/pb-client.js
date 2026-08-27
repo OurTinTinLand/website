@@ -100,6 +100,7 @@ export const {
     listCoursesNormalized, listEventsNormalized, listHackathonsNormalized,
     listJobsNormalized, listAppsNormalized, listProvidersNormalized,
     listJobPostingsNormalized, listTalentProfilesNormalized,
+    listHomeOpsNormalized,
     getUserProfileNormalized, getUserProfileByUserIdNormalized,
     // normalizer 单条
     normalizeCourse, normalizeEvent, normalizeHackathon, normalizeJob,

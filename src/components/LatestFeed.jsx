@@ -10,7 +10,7 @@ const KIND_META = {
   hackathon:{ label:'黑客松', cls:'k-hack' },
 };
 
-export function LatestFeed({ courses, events, hackathons, onOpen }) {
+export function LatestFeed({ courses, events, hackathons, pin, onOpen }) {
   const rows = [
     ...(events || []).filter((x) => x.content_source === 'native').map((e) => ({
       d: e.start_at, k: 'event', t: e.title, s: stateOf(e.start_at, e.end_at),
@@ -24,9 +24,20 @@ export function LatestFeed({ courses, events, hackathons, onOpen }) {
       d: c.start_at, k: 'course', t: c.title, s: stateOf(c.start_at, c.end_at),
       meta: c.price.type === 'free' ? '免费' : `¥${money(c.price.amount)}`, id: c.id,
     })),
-  ]
-    .sort((a, b) => new Date(b.d) - new Date(a.d))
-    .slice(0, 8);
+  ];
+
+  // §14.3 手动置顶：pin = [{kind,id}]，按 pin 顺序优先，剩余按时间倒序
+  const pinKeys = (pin || []).map((p) => `${p.kind}:${p.id}`);
+  const pinned = [];
+  (pin || []).forEach((p) => {
+    const hit = rows.find((x) => x.k === p.kind && x.id === p.id);
+    if (hit) pinned.push({ ...hit, _pinned: true });
+  });
+  const rest = rows
+    .filter((x) => !pinKeys.includes(`${x.k}:${x.id}`))
+    .sort((a, b) => new Date(b.d) - new Date(a.d));
+
+  const all = [...pinned, ...rest].slice(0, 8);
 
   return (
     <div className="sec">
@@ -38,16 +49,17 @@ export function LatestFeed({ courses, events, hackathons, onOpen }) {
           </div>
           <p className="lead">活动与黑客松是独立板块，这里共用一条时间线，兼顾浏览习惯。</p>
         </div>
-        {rows.length === 0 ? (
+        {all.length === 0 ? (
           <div className="empty" style={{ padding:'30px 0' }}>
             站内内容准备中，先去板块逛逛吧
           </div>
         ) : (
           <div className="feed">
-            {rows.map((x, i) => {
+            {all.map((x, i) => {
               const km = KIND_META[x.k];
               return (
-                <div key={i} className="feed-row" onClick={() => onOpen(x.k, x.id)}>
+                <div key={i} className={'feed-row' + (x._pinned ? ' feed-pinned' : '')} onClick={() => onOpen(x.k, x.id)}>
+                  {x._pinned && <span className="feed-kind feed-pin-tag">置顶</span>}
                   <span className="feed-date">{dateOnly(x.d)}</span>
                   <span className={'feed-kind ' + km.cls}>{km.label}</span>
                   <span className="feed-title">{x.t}</span>

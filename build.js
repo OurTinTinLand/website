@@ -10,6 +10,7 @@
 //   backend/pb_public/src/styles/*.css （CSS 直接拷贝）
 //   backend/pb_public/assets-claude/   （品牌素材直接拷贝）
 const { execSync, spawn } = require('child_process');
+const crypto = require('crypto');
 const path = require('path');
 const fs = require('fs');
 
@@ -83,7 +84,16 @@ if (watch) {
   try {
     execSync(`${ESBUILD} ${args.join(' ')}`, { stdio: 'inherit', cwd: ROOT });
     execSync(`node "${path.join(ROOT, 'postbuild.js')}"`, { stdio: 'inherit' });
-    console.log('build OK → ' + path.join(PUBLIC, 'dist', 'bundle.js'));
+    // 3) bundle 版本化：PB 静态服务无 Cache-Control，浏览器会启发式缓存 bundle；
+    //    每次构建给 index.html 里的引用加内容 hash，强制客户端拉新包。
+    const bundleHash = crypto.createHash('sha1')
+      .update(fs.readFileSync(path.join(PUBLIC, 'dist', 'bundle.js')))
+      .digest('hex').slice(0, 10);
+    const idxPath = path.join(PUBLIC, 'index.html');
+    const html = fs.readFileSync(idxPath, 'utf8')
+      .replace(/(dist\/bundle\.js)(\?v=[a-f0-9]+)?/g, `dist/bundle.js?v=${bundleHash}`);
+    fs.writeFileSync(idxPath, html);
+    console.log('build OK → ' + path.join(PUBLIC, 'dist', 'bundle.js') + ' (v=' + bundleHash + ')');
   } catch (e) {
     console.error('build FAILED');
     process.exit(1);

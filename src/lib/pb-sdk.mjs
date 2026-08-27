@@ -531,6 +531,22 @@ export function createPbClient(config) {
         const r = await listCollection('talent_profiles', qs);
         return r.items.map(normalizeTalentProfile);
     }
+    // ---- 11b. 首页运营位 / 通知文案（spec §14.3 / §14.7）----
+    function normalizeHomeOps(items) {
+        const out = { logoWall: null, hero: null, notifyTemplates: null, feedPin: [], raw: [] };
+        for (const r of items || []) {
+            out.raw.push({ id: r.id, key: r.key, data: r.data });
+            if (r.key === 'logo_wall') out.logoWall = r.data;
+            else if (r.key === 'hero') out.hero = r.data;
+            else if (r.key === 'notify_templates') out.notifyTemplates = r.data;
+            else if (r.key === 'feed_pin') out.feedPin = r.data || [];
+        }
+        return out;
+    }
+    async function listHomeOpsNormalized(qs) {
+        const r = await listCollection('home_ops', qs);
+        return normalizeHomeOps(r.items);
+    }
     async function getUserProfileNormalized(id) {
         return normalizeUserProfile(await getUserProfile(id));
     }
@@ -684,6 +700,7 @@ export function createPbClient(config) {
         listCoursesNormalized, listEventsNormalized, listHackathonsNormalized,
         listJobsNormalized, listAppsNormalized, listProvidersNormalized,
         listJobPostingsNormalized, listTalentProfilesNormalized,
+        listHomeOpsNormalized,
         getUserProfileNormalized, getUserProfileByUserIdNormalized,
         // single-record normalizer
         normalizeCourse, normalizeEvent, normalizeHackathon, normalizeJob,
